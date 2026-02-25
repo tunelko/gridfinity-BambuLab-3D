@@ -41,6 +41,7 @@ interface AppState {
 
   bins: Bin[];
   selectedBinId: string | null;
+  selectedBinIds: string[];
 
   viewMode: ViewMode;
   renderMode: RenderMode;
@@ -58,7 +59,7 @@ interface AppState {
   removeBin: (id: string) => void;
   updateBin: (id: string, updates: Partial<Bin>) => void;
   moveBin: (id: string, x: number, y: number) => void;
-  selectBin: (id: string | null) => void;
+  selectBin: (id: string | null, multi?: boolean) => void;
   setGridSize: (cols: number, rows: number) => void;
   setViewMode: (mode: ViewMode) => void;
   setRenderMode: (mode: RenderMode) => void;
@@ -95,6 +96,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   bins: [],
   selectedBinId: null,
+  selectedBinIds: [],
 
   viewMode: 'split',
   renderMode: 'standard' as RenderMode,
@@ -115,16 +117,18 @@ export const useStore = create<AppState>()((set, get) => ({
     };
     const bins = [...state.bins, bin];
     const hist = pushHistory({ ...state, bins });
-    return { bins, ...hist, selectedBinId: bin.id };
+    return { bins, ...hist, selectedBinId: bin.id, selectedBinIds: [bin.id] };
   }),
 
   removeBin: (id) => set((state) => {
     const bins = state.bins.filter((b) => b.id !== id);
     const hist = pushHistory({ ...state, bins });
+    const newIds = state.selectedBinIds.filter((sid) => sid !== id);
     return {
       bins,
       ...hist,
-      selectedBinId: state.selectedBinId === id ? null : state.selectedBinId,
+      selectedBinId: state.selectedBinId === id ? (newIds[newIds.length - 1] ?? null) : state.selectedBinId,
+      selectedBinIds: newIds,
     };
   }),
 
@@ -140,7 +144,20 @@ export const useStore = create<AppState>()((set, get) => ({
     return { bins, ...hist };
   }),
 
-  selectBin: (id) => set({ selectedBinId: id }),
+  selectBin: (id, multi) => set((state) => {
+    if (!id) return { selectedBinId: null, selectedBinIds: [] };
+    if (multi) {
+      const already = state.selectedBinIds.includes(id);
+      const newIds = already
+        ? state.selectedBinIds.filter((sid) => sid !== id)
+        : [...state.selectedBinIds, id];
+      return {
+        selectedBinId: already ? (newIds[newIds.length - 1] ?? null) : id,
+        selectedBinIds: newIds,
+      };
+    }
+    return { selectedBinId: id, selectedBinIds: [id] };
+  }),
 
   setGridSize: (cols, rows) => set({ gridCols: cols, gridRows: rows }),
 
@@ -154,7 +171,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   clearAll: () => set((state) => {
     const hist = pushHistory({ ...state, bins: [] });
-    return { bins: [], selectedBinId: null, ...hist, dragState: { ...DEFAULT_DRAG } };
+    return { bins: [], selectedBinId: null, selectedBinIds: [], ...hist, dragState: { ...DEFAULT_DRAG } };
   }),
 
   setDragState: (partial) => set((state) => ({

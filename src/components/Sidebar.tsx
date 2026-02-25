@@ -114,9 +114,11 @@ function decodeLayoutFromURL(): { gridCols: number; gridRows: number; bins: Omit
 export default function Sidebar() {
   const bins = useStore((s) => s.bins);
   const selectedBinId = useStore((s) => s.selectedBinId);
+  const selectedBinIds = useStore((s) => s.selectedBinIds);
   const selectBin = useStore((s) => s.selectBin);
   const addBin = useStore((s) => s.addBin);
   const removeBin = useStore((s) => s.removeBin);
+  const updateBin = useStore((s) => s.updateBin);
   const gridCols = useStore((s) => s.gridCols);
   const gridRows = useStore((s) => s.gridRows);
   const setGridSize = useStore((s) => s.setGridSize);
@@ -136,6 +138,7 @@ export default function Sidebar() {
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [showGistConfirm, setShowGistConfirm] = useState(false);
   const [binsCollapsed, setBinsCollapsed] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [tokenInput, setTokenInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedBin = bins.find((b) => b.id === selectedBinId) ?? null;
@@ -959,59 +962,227 @@ export default function Sidebar() {
           <div style={{ padding: '0 16px 12px' }}>
             {bins.length === 0 ? (
               <p className="text-center" style={{ padding: '12px 0', opacity: 0.4, fontSize: 11 }}>No bins placed yet</p>
-            ) : (
-              <div className="flex flex-col" style={{ gap: 4 }}>
-                {bins.map((bin) => {
-                  const isSelected = selectedBinId === bin.id;
-                  return (
-                    <div
-                      key={bin.id}
-                      onClick={() => selectBin(bin.id)}
-                      className="flex items-center rounded cursor-pointer transition-colors"
-                      style={{
-                        gap: 8, padding: '5px 10px', minHeight: 30,
-                        background: isSelected ? 'var(--bg-tertiary)' : 'transparent',
-                        border: isSelected ? '1px solid var(--accent)' : '1px solid transparent',
-                      }}
-                      onMouseEnter={(e) => { if (!isSelected) (e.currentTarget.style.background = 'rgba(255,255,255,0.03)'); }}
-                      onMouseLeave={(e) => { if (!isSelected) (e.currentTarget.style.background = 'transparent'); }}
-                    >
-                      <div className="shrink-0" style={{ width: 14, height: 14, borderRadius: 3, background: bin.color }} />
-                      {bin.group && (() => {
-                        const grp = BIN_GROUPS.find((g) => g.id === bin.group);
-                        return grp ? (
-                          <div className="shrink-0" title={grp.label}
-                            style={{ width: 8, height: 8, borderRadius: '50%', background: grp.color }}
-                          />
-                        ) : null;
-                      })()}
-                      <div className="flex-1 truncate" style={{ fontSize: 11 }}>
-                        {bin.label || 'Bin'}
-                        <span style={{ fontSize: 10, opacity: 0.45, marginLeft: 6 }}>
-                          {bin.w}x{bin.d}x{bin.h}u
-                        </span>
+            ) : (() => {
+              // Group bins by group id
+              const grouped: { groupId: string; grp: typeof BIN_GROUPS[number] | null; items: typeof bins }[] = [];
+              const groupMap = new Map<string, typeof bins>();
+              for (const bin of bins) {
+                const gid = bin.group || '';
+                if (!groupMap.has(gid)) groupMap.set(gid, []);
+                groupMap.get(gid)!.push(bin);
+              }
+              // Sort: named groups first (alphabetical), ungrouped last
+              const sortedKeys = [...groupMap.keys()].sort((a, b) => {
+                if (!a) return 1;
+                if (!b) return -1;
+                return a.localeCompare(b);
+              });
+              for (const gid of sortedKeys) {
+                const grp = gid ? BIN_GROUPS.find((g) => g.id === gid) || null : null;
+                grouped.push({ groupId: gid, grp, items: groupMap.get(gid)! });
+              }
+
+              const hasMultipleGroups = grouped.length > 1 || (grouped.length === 1 && grouped[0].groupId !== '');
+
+              return (
+                <div className="flex flex-col" style={{ gap: 2 }}>
+                  {grouped.map(({ groupId, grp, items }) => {
+                    const isGroupCollapsed = collapsedGroups[groupId] ?? false;
+                    const groupLabel = grp?.label || 'Ungrouped';
+                    const groupColor = grp?.color || 'var(--text-secondary)';
+
+                    return (
+                      <div key={groupId || '__none'}>
+                        {/* Group sub-header (only if multiple groups exist) */}
+                        {hasMultipleGroups && (
+                          <button
+                            onClick={() => setCollapsedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }))}
+                            className="w-full flex items-center transition-colors"
+                            style={{
+                              gap: 6, padding: '4px 6px', marginTop: 4,
+                              background: 'none', border: 'none', cursor: 'pointer',
+                            }}
+                          >
+                            <span style={{
+                              fontSize: 8, color: groupColor,
+                              transition: 'transform 0.15s',
+                              display: 'inline-block',
+                              transform: isGroupCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+                            }}>
+                              ▼
+                            </span>
+                            {grp?.color && (
+                              <span style={{
+                                width: 6, height: 6, borderRadius: '50%',
+                                background: grp.color, display: 'inline-block', flexShrink: 0,
+                              }} />
+                            )}
+                            <span style={{ fontSize: 10, fontWeight: 600, color: groupColor }}>
+                              {groupLabel}
+                            </span>
+                            <span style={{
+                              fontSize: 9, color: 'var(--text-secondary)', opacity: 0.5,
+                              marginLeft: 'auto',
+                            }}>
+                              {items.length}
+                            </span>
+                          </button>
+                        )}
+
+                        {/* Bin items */}
+                        {!(hasMultipleGroups && isGroupCollapsed) && (
+                          <div className="flex flex-col" style={{ gap: 2 }}>
+                            {items.map((bin) => {
+                              const isSelected = selectedBinIds.includes(bin.id);
+                              return (
+                                <div
+                                  key={bin.id}
+                                  onClick={(e) => selectBin(bin.id, e.shiftKey)}
+                                  className="flex items-center rounded cursor-pointer transition-colors"
+                                  style={{
+                                    gap: 8, padding: '5px 10px', minHeight: 28,
+                                    marginLeft: hasMultipleGroups ? 12 : 0,
+                                    background: isSelected ? 'var(--bg-tertiary)' : 'transparent',
+                                    border: isSelected ? '1px solid var(--accent)' : '1px solid transparent',
+                                  }}
+                                  onMouseEnter={(e) => { if (!isSelected) (e.currentTarget.style.background = 'rgba(255,255,255,0.03)'); }}
+                                  onMouseLeave={(e) => { if (!isSelected) (e.currentTarget.style.background = 'transparent'); }}
+                                >
+                                  <div className="shrink-0" style={{ width: 12, height: 12, borderRadius: 3, background: bin.color }} />
+                                  <div className="flex-1 truncate" style={{ fontSize: 11 }}>
+                                    {bin.label || 'Bin'}
+                                    <span style={{ fontSize: 10, opacity: 0.45, marginLeft: 6 }}>
+                                      {bin.w}x{bin.d}x{bin.h}u
+                                    </span>
+                                  </div>
+                                  <span style={{ fontSize: 10, opacity: 0.4 }}>
+                                    ({bin.x},{bin.y})
+                                  </span>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); removeBin(bin.id); }}
+                                    className="opacity-40 hover:opacity-100 transition-opacity flex items-center justify-center"
+                                    style={{ color: 'var(--danger)', width: 18, height: 18, fontSize: 12 }}
+                                  >
+                                    x
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                      <span style={{ fontSize: 10, opacity: 0.4 }}>
-                        ({bin.x},{bin.y})
-                      </span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); removeBin(bin.id); }}
-                        className="opacity-40 hover:opacity-100 transition-opacity flex items-center justify-center"
-                        style={{ color: 'var(--danger)', width: 20, height: 20, fontSize: 14 }}
-                      >
-                        x
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
 
-      {/* Configurator */}
-      {selectedBin && <BinConfigurator bin={selectedBin} />}
+      {/* Configurator (only for single selection) */}
+      {selectedBin && selectedBinIds.length === 1 && <BinConfigurator bin={selectedBin} />}
+
+      {/* Multi-selection bulk actions */}
+      {selectedBinIds.length > 1 && (
+        <div className="animate-slide-up" style={{ padding: 16, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <h4
+            className="font-bold uppercase"
+            style={{ fontSize: 11, letterSpacing: '0.05em', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}
+          >
+            {selectedBinIds.length} BINS SELECTED
+          </h4>
+
+          {/* Bulk Group */}
+          <h4
+            className="font-bold uppercase"
+            style={{ fontSize: 11, letterSpacing: '0.05em', color: 'rgba(255,255,255,0.5)', marginTop: 12, marginBottom: 8 }}
+          >
+            GROUP
+          </h4>
+          <div className="flex flex-wrap" style={{ gap: 4 }}>
+            {BIN_GROUPS.map((g) => {
+              // Check if all selected bins share this group
+              const selectedBins = bins.filter((b) => selectedBinIds.includes(b.id));
+              const allSame = selectedBins.every((b) => (b.group || '') === g.id);
+              return (
+                <button
+                  key={g.id}
+                  onClick={() => {
+                    for (const id of selectedBinIds) {
+                      updateBin(id, { group: g.id });
+                    }
+                  }}
+                  className="rounded transition-colors hover:brightness-125"
+                  style={{
+                    padding: '4px 10px', fontSize: 11,
+                    background: allSame
+                      ? (g.color ? g.color + '33' : 'var(--bg-tertiary)')
+                      : 'var(--bg-tertiary)',
+                    border: allSame
+                      ? `1px solid ${g.color || 'var(--accent)'}`
+                      : '1px solid var(--border)',
+                    color: allSame
+                      ? (g.color || 'var(--text-primary)')
+                      : 'var(--text-secondary)',
+                    fontWeight: allSame ? 600 : 400,
+                  }}
+                >
+                  {g.color && (
+                    <span style={{
+                      display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
+                      background: g.color, marginRight: 4, verticalAlign: 'middle',
+                    }} />
+                  )}
+                  {g.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Bulk Color */}
+          <h4
+            className="font-bold uppercase"
+            style={{ fontSize: 11, letterSpacing: '0.05em', color: 'rgba(255,255,255,0.5)', marginTop: 12, marginBottom: 8 }}
+          >
+            COLOR
+          </h4>
+          <div className="flex" style={{ gap: 6 }}>
+            {['#00d4aa', '#4488ff', '#ff6644', '#ffaa00', '#aa44ff', '#ff44aa'].map((c) => (
+              <button
+                key={c}
+                onClick={() => {
+                  for (const id of selectedBinIds) {
+                    updateBin(id, { color: c });
+                  }
+                }}
+                className="transition-transform"
+                style={{
+                  width: 28, height: 28, borderRadius: 6,
+                  background: c,
+                  border: '2px solid transparent',
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Bulk Delete */}
+          <button
+            onClick={() => {
+              for (const id of [...selectedBinIds]) {
+                removeBin(id);
+              }
+            }}
+            className="w-full rounded font-medium transition-colors hover:brightness-125"
+            style={{
+              height: 30, fontSize: 11, marginTop: 14,
+              background: 'rgba(255, 68, 68, 0.1)', color: 'var(--danger)', border: '1px solid rgba(255, 68, 68, 0.3)',
+            }}
+          >
+            Delete {selectedBinIds.length} Bins
+          </button>
+        </div>
+      )}
 
       {/* Save / Load / Share */}
       <Section title="LAYOUT">

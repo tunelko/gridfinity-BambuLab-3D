@@ -23,7 +23,7 @@ export default function GridCanvas2D() {
   const bins = useStore((s) => s.bins);
   const gridCols = useStore((s) => s.gridCols);
   const gridRows = useStore((s) => s.gridRows);
-  const selectedBinId = useStore((s) => s.selectedBinId);
+  const selectedBinIds = useStore((s) => s.selectedBinIds);
   const selectBin = useStore((s) => s.selectBin);
   const addBin = useStore((s) => s.addBin);
   const removeBin = useStore((s) => s.removeBin);
@@ -76,10 +76,10 @@ export default function GridCanvas2D() {
     );
   }, [pan, zoom]);
 
-  // ── Hit-test resize handles ──
+  // ── Hit-test resize handles (only when single selection) ──
   const hitTestHandle = useCallback((clientX: number, clientY: number): { binId: string; edge: ResizeEdge } | null => {
-    if (!containerRef.current || !selectedBinId) return null;
-    const bin = bins.find((b) => b.id === selectedBinId);
+    if (!containerRef.current || selectedBinIds.length !== 1) return null;
+    const bin = bins.find((b) => b.id === selectedBinIds[0]);
     if (!bin) return null;
 
     const rect = containerRef.current.getBoundingClientRect();
@@ -111,12 +111,12 @@ export default function GridCanvas2D() {
     }
 
     return null;
-  }, [selectedBinId, bins, pan, cellSize]);
+  }, [selectedBinIds, bins, pan, cellSize]);
 
-  // ── Hit-test rotate handle ──
+  // ── Hit-test rotate handle (only when single selection) ──
   const hitTestRotate = useCallback((clientX: number, clientY: number): boolean => {
-    if (!containerRef.current || !selectedBinId) return false;
-    const bin = bins.find((b) => b.id === selectedBinId);
+    if (!containerRef.current || selectedBinIds.length !== 1) return false;
+    const bin = bins.find((b) => b.id === selectedBinIds[0]);
     if (!bin || bin.w === bin.d) return false;
 
     const rect = containerRef.current.getBoundingClientRect();
@@ -132,7 +132,7 @@ export default function GridCanvas2D() {
     const cy = by - 2;
     const dist = Math.sqrt((mx - cx) ** 2 + (my - cy) ** 2);
     return dist <= 14; // generous hit area
-  }, [selectedBinId, bins, pan, cellSize]);
+  }, [selectedBinIds, bins, pan, cellSize]);
 
   // ── Keyboard shortcuts ──
   useEffect(() => {
@@ -154,22 +154,24 @@ export default function GridCanvas2D() {
         return;
       }
 
-      // Delete/Backspace: remove selected bin
-      if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedBinId) {
+      // Delete/Backspace: remove all selected bins
+      if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedBinIds.length > 0) {
         // Don't delete if user is typing in an input
         if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
-        removeBin(state.selectedBinId);
+        for (const id of [...state.selectedBinIds]) {
+          removeBin(id);
+        }
         return;
       }
 
-      // R: rotate placing ghost or selected bin (swap W↔D)
+      // R: rotate placing ghost or selected bin (swap W↔D, only single selection)
       if (e.key === 'r' || e.key === 'R') {
         if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
         if (state.dragState.mode === 'placing' && state.dragState.placingConfig) {
           const cfg = state.dragState.placingConfig;
           useStore.getState().startPlacing({ ...cfg, w: cfg.d, d: cfg.w });
-        } else if (state.selectedBinId) {
-          const bin = state.bins.find((b) => b.id === state.selectedBinId);
+        } else if (state.selectedBinIds.length === 1) {
+          const bin = state.bins.find((b) => b.id === state.selectedBinIds[0]);
           if (bin && bin.w !== bin.d) {
             const collision = checkCollision(
               state.bins,
@@ -181,6 +183,21 @@ export default function GridCanvas2D() {
             if (!collision) {
               useStore.getState().updateBin(bin.id, { w: bin.d, d: bin.w });
             }
+          }
+        }
+        return;
+      }
+
+      // Ctrl+A: select all bins
+      if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+        const allBins = state.bins;
+        if (allBins.length > 0) {
+          // Select first, then add the rest
+          useStore.getState().selectBin(allBins[0].id);
+          for (let i = 1; i < allBins.length; i++) {
+            useStore.getState().selectBin(allBins[i].id, true);
           }
         }
         return;
@@ -221,8 +238,8 @@ export default function GridCanvas2D() {
 
   // ── Mouse down ──
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Middle click or shift+left = pan
-    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+    // Middle click = pan (shift+left is now multi-select)
+    if (e.button === 1) {
       setIsPanning(true);
       panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
       return;
@@ -230,9 +247,9 @@ export default function GridCanvas2D() {
 
     if (e.button !== 0) return;
 
-    // Check rotate handle hit first
+    // Check rotate handle hit first (single selection only)
     if (hitTestRotate(e.clientX, e.clientY)) {
-      const bin = bins.find((b) => b.id === selectedBinId);
+      const bin = selectedBinIds.length === 1 ? bins.find((b) => b.id === selectedBinIds[0]) : null;
       if (bin) {
         const collision = checkCollision(
           bins,
@@ -248,9 +265,9 @@ export default function GridCanvas2D() {
       return;
     }
 
-    // Check divider +/- button hits
-    if (selectedBinId && containerRef.current) {
-      const bin = bins.find((b) => b.id === selectedBinId);
+    // Check divider +/- button hits (single selection only)
+    if (selectedBinIds.length === 1 && containerRef.current) {
+      const bin = bins.find((b) => b.id === selectedBinIds[0]);
       if (bin) {
         const rect = containerRef.current.getBoundingClientRect();
         const mx = e.clientX - rect.left;
@@ -319,19 +336,21 @@ export default function GridCanvas2D() {
     );
 
     if (clickedBin) {
-      selectBin(clickedBin.id);
-      // Prepare for potential drag (wait for threshold)
-      mouseDownRef.current = {
-        x: e.clientX,
-        y: e.clientY,
-        binId: clickedBin.id,
-        col: clickedBin.x,
-        row: clickedBin.y,
-      };
+      selectBin(clickedBin.id, e.shiftKey);
+      // Prepare for potential drag (wait for threshold) — only single select
+      if (!e.shiftKey) {
+        mouseDownRef.current = {
+          x: e.clientX,
+          y: e.clientY,
+          binId: clickedBin.id,
+          col: clickedBin.x,
+          row: clickedBin.y,
+        };
+      }
     } else {
       selectBin(null);
     }
-  }, [getGridCoord, bins, dragState, addBin, selectBin, updateBin, selectedBinId, pan, gridCols, gridRows, hitTestHandle, hitTestRotate]);
+  }, [getGridCoord, bins, dragState, addBin, selectBin, updateBin, selectedBinIds, pan, gridCols, gridRows, hitTestHandle, hitTestRotate, cellSize]);
 
   // ── Mouse move ──
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
@@ -837,8 +856,8 @@ export default function GridCanvas2D() {
                 height={bin.d * cellSize - 4}
                 rx={4}
                 fill={bin.color + '44'}
-                stroke={selectedBinId === bin.id ? 'var(--accent)' : bin.color}
-                strokeWidth={selectedBinId === bin.id ? 2 : 1}
+                stroke={selectedBinIds.includes(bin.id) ? 'var(--accent)' : bin.color}
+                strokeWidth={selectedBinIds.includes(bin.id) ? 2 : 1}
                 style={isSnapping ? {
                   transition: 'x 0.3s ease-out, y 0.3s ease-out',
                   x: pan.x + snapBack.toCol * cellSize + 2,
@@ -846,7 +865,7 @@ export default function GridCanvas2D() {
                 } : undefined}
               />
               {/* Selection glow (pulsing) */}
-              {selectedBinId === bin.id && !isSnapping && (
+              {selectedBinIds.includes(bin.id) && !isSnapping && (
                 <rect
                   x={pan.x + bin.x * cellSize}
                   y={pan.y + bin.y * cellSize}
@@ -867,7 +886,7 @@ export default function GridCanvas2D() {
                 const by2 = pan.y + bin.y * cellSize + 2;
                 const bw2 = bin.w * cellSize - 4;
                 const bh2 = bin.d * cellSize - 4;
-                const isSelected = selectedBinId === bin.id;
+                const isSelected = selectedBinIds.includes(bin.id);
                 return (
                   <g pointerEvents="none">
                     {/* X dividers (vertical lines) */}
@@ -927,8 +946,8 @@ export default function GridCanvas2D() {
                 );
               })()}
 
-              {/* ── Divider controls (on selected bin) ── */}
-              {selectedBinId === bin.id && !isSnapping && !drag && !resize && dragState.mode === 'idle' && (() => {
+              {/* ── Divider controls (single selection only) ── */}
+              {selectedBinIds.length === 1 && selectedBinIds[0] === bin.id && !isSnapping && !drag && !resize && dragState.mode === 'idle' && (() => {
                 const bx2 = pan.x + bin.x * cellSize;
                 const by2 = pan.y + bin.y * cellSize;
                 const bw2 = bin.w * cellSize;
@@ -999,8 +1018,8 @@ export default function GridCanvas2D() {
                 );
               })()}
 
-              {/* ── Resize handles (only on selected bin, not during drag/place) ── */}
-              {selectedBinId === bin.id && !isSnapping && !drag && !resize && dragState.mode === 'idle' && (() => {
+              {/* ── Resize handles (single selection only, not during drag/place) ── */}
+              {selectedBinIds.length === 1 && selectedBinIds[0] === bin.id && !isSnapping && !drag && !resize && dragState.mode === 'idle' && (() => {
                 const bx = pan.x + bin.x * cellSize;
                 const by = pan.y + bin.y * cellSize;
                 const bw = bin.w * cellSize;
@@ -1210,7 +1229,7 @@ export default function GridCanvas2D() {
             hoverCell.col >= b.x && hoverCell.col < b.x + b.w &&
             hoverCell.row >= b.y && hoverCell.row < b.y + b.d
           );
-          if (!hoveredBin || hoveredBin.id === selectedBinId) return null;
+          if (!hoveredBin || selectedBinIds.includes(hoveredBin.id)) return null;
 
           const bx = pan.x + hoveredBin.x * cellSize;
           const by = pan.y + hoveredBin.y * cellSize;
@@ -1264,9 +1283,9 @@ export default function GridCanvas2D() {
           );
         })()}
 
-        {/* Selected bin dimensions (always show mm for selected bin) */}
-        {selectedBinId && !drag && !resize && (() => {
-          const bin = bins.find((b) => b.id === selectedBinId);
+        {/* Selected bin dimensions (show mm for single selected bin) */}
+        {selectedBinIds.length === 1 && !drag && !resize && (() => {
+          const bin = bins.find((b) => b.id === selectedBinIds[0]);
           if (!bin) return null;
 
           const bx = pan.x + bin.x * cellSize;
@@ -1340,6 +1359,16 @@ export default function GridCanvas2D() {
       >
         {(zoom * 100).toFixed(0)}%
       </div>
+
+      {/* Multi-selection indicator */}
+      {selectedBinIds.length > 1 && (
+        <div
+          className="absolute top-3 left-3 text-[10px] px-2 py-1 rounded"
+          style={{ background: 'rgba(0, 212, 170, 0.15)', color: 'var(--accent)', border: '1px solid rgba(0, 212, 170, 0.3)' }}
+        >
+          {selectedBinIds.length} bins selected | Del to remove | Ctrl+A select all
+        </div>
+      )}
 
       {/* Keyboard hint during placing mode */}
       {dragState.mode === 'placing' && (
