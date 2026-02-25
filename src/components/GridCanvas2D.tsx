@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { CELL_PX, screenToGrid } from '../utils/gridMath';
 import { checkCollision } from '../utils/collision';
-import { GF } from '../gridfinity/constants';
+import { GF, BIN_GROUPS } from '../gridfinity/constants';
 
 const DRAG_THRESHOLD = 5; // px movement to start drag
 const HANDLE_SIZE = 8;    // px size of resize handles
@@ -486,6 +486,75 @@ export default function GridCanvas2D() {
     }
   }, [drag, resize]);
 
+  // ── Drop from sidebar (drag bin preset) ──
+  const [dropGhost, setDropGhost] = useState<{ col: number; row: number; w: number; d: number; valid: boolean } | null>(null);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('application/gridfinity-preset')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+
+    const coord = getGridCoord(e.clientX, e.clientY);
+    if (!coord) return;
+
+    // Read preset size from global (set during dragstart in Sidebar)
+    const preset = (window as any).__gridfinityDragPreset as { w: number; d: number } | undefined;
+    const w = preset?.w ?? 1;
+    const d = preset?.d ?? 1;
+    const valid = !checkCollision(bins, { x: coord.col, y: coord.row, w, d }, null, gridCols, gridRows);
+    setDropGhost({ col: coord.col, row: coord.row, w, d, valid });
+  }, [getGridCoord, bins, gridCols, gridRows]);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('application/gridfinity-preset')) return;
+    e.preventDefault();
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDropGhost(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDropGhost(null);
+    (window as any).__gridfinityDragPreset = null;
+
+    const raw = e.dataTransfer.getData('application/gridfinity-preset');
+    if (!raw) return;
+
+    try {
+      const preset = JSON.parse(raw);
+      const coord = getGridCoord(e.clientX, e.clientY);
+      if (!coord) return;
+
+      const collision = checkCollision(
+        bins,
+        { x: coord.col, y: coord.row, w: preset.w, d: preset.d },
+        null,
+        gridCols,
+        gridRows,
+      );
+      if (!collision) {
+        addBin({
+          x: coord.col, y: coord.row,
+          w: preset.w, d: preset.d, h: preset.h ?? 3,
+          cornerRadius: GF.BIN_CORNER_RADIUS,
+          wallThickness: GF.WALL_THICKNESS,
+          bottomThickness: GF.BOTTOM_THICKNESS,
+          stackingLip: preset.stackingLip ?? false,
+          labelShelf: preset.labelShelf ?? false,
+          labelWidth: GF.LABEL_DEFAULT_WIDTH,
+          magnets: preset.magnets ?? false,
+          screws: preset.screws ?? false,
+          dividersX: preset.dividersX ?? 0,
+          dividersY: preset.dividersY ?? 0,
+          color: '', label: preset.name ?? '',
+          group: '',
+        });
+      }
+    } catch { /* ignore invalid data */ }
+  }, [getGridCoord, bins, addBin, gridCols, gridRows]);
+
   // ── Placing ghost ──
   const placingGhost = dragState.mode === 'placing' && dragState.placingConfig && hoverCell
     ? {
@@ -550,6 +619,10 @@ export default function GridCanvas2D() {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <svg
         width="100%"
@@ -836,6 +909,23 @@ export default function GridCanvas2D() {
               >
                 {bin.label || `${bin.w}x${bin.d}`}
               </text>
+              {/* Group color indicator (small dot top-left) */}
+              {bin.group && (() => {
+                const grp = BIN_GROUPS.find((g) => g.id === bin.group);
+                if (!grp) return null;
+                const bx2 = pan.x + (isSnapping ? (snapBack?.toCol ?? bin.x) : bin.x) * cellSize;
+                const by2 = pan.y + (isSnapping ? (snapBack?.toRow ?? bin.y) : bin.y) * cellSize;
+                const dotR = Math.max(3, 4 * zoom);
+                return (
+                  <circle
+                    cx={bx2 + 8} cy={by2 + 8}
+                    r={dotR}
+                    fill={grp.color}
+                    stroke="var(--bg-primary)" strokeWidth={1}
+                    pointerEvents="none"
+                  />
+                );
+              })()}
 
               {/* ── Divider controls (on selected bin) ── */}
               {selectedBinId === bin.id && !isSnapping && !drag && !resize && dragState.mode === 'idle' && (() => {
@@ -1035,6 +1125,23 @@ export default function GridCanvas2D() {
             >
               {placingGhost.w}x{placingGhost.d}
             </text>
+          </g>
+        )}
+
+        {/* Drop ghost (from sidebar drag) */}
+        {dropGhost && (
+          <g pointerEvents="none">
+            <rect
+              x={pan.x + dropGhost.col * cellSize + 2}
+              y={pan.y + dropGhost.row * cellSize + 2}
+              width={dropGhost.w * cellSize - 4}
+              height={dropGhost.d * cellSize - 4}
+              rx={4}
+              fill={dropGhost.valid ? '#00d4aa22' : '#ff446622'}
+              stroke={dropGhost.valid ? 'var(--accent)' : 'var(--danger)'}
+              strokeWidth={2}
+              strokeDasharray="4,4"
+            />
           </g>
         )}
 

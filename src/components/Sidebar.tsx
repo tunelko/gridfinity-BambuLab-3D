@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useStore, type Bin } from '../store/useStore';
-import { GF, GRID_PRESETS, BIN_PRESETS } from '../gridfinity/constants';
+import { GF, GRID_PRESETS, BIN_PRESETS, BIN_GROUPS, LAYOUT_TEMPLATES, type LayoutTemplate } from '../gridfinity/constants';
 import { checkCollision } from '../utils/collision';
 import BinConfigurator from './BinConfigurator';
 
@@ -66,7 +66,7 @@ function encodeLayoutToURL(): string {
       sl: b.stackingLip ? 1 : 0, ls: b.labelShelf ? 1 : 0, lw: b.labelWidth,
       mg: b.magnets ? 1 : 0, sc: b.screws ? 1 : 0,
       dx: b.dividersX, dy: b.dividersY,
-      lb: b.label,
+      lb: b.label, gr: b.group || '',
     })),
   };
   const json = JSON.stringify(data);
@@ -90,7 +90,7 @@ function decodeLayoutFromURL(): { gridCols: number; gridRows: number; bins: Omit
         stackingLip: !!b.sl, labelShelf: !!b.ls, labelWidth: b.lw,
         magnets: !!b.mg, screws: !!b.sc,
         dividersX: b.dx, dividersY: b.dy,
-        color: '', label: b.lb || '',
+        color: '', label: b.lb || '', group: b.gr || '',
       })),
     };
   } catch { return null; }
@@ -132,6 +132,12 @@ export default function Sidebar() {
 
   const [autoFillSize, setAutoFillSize] = useState<{ w: number; d: number; h: number }>({ w: 1, d: 1, h: 3 });
   const [plaEurKg, setPlaEurKg] = useState(20); // €/kg default
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showTokenModal, setShowTokenModal] = useState(false);
+  const [showGistConfirm, setShowGistConfirm] = useState(false);
+  const [binsCollapsed, setBinsCollapsed] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedBin = bins.find((b) => b.id === selectedBinId) ?? null;
 
   // ── BOM: group bins by type ──
@@ -181,6 +187,7 @@ export default function Sidebar() {
       dividersY: preset?.dividersY ?? 0,
       color: '',
       label: preset?.name ?? '',
+      group: '',
     };
     startPlacing(config);
   }
@@ -206,6 +213,7 @@ export default function Sidebar() {
             dividersY: preset?.dividersY ?? 0,
             color: '',
             label: preset?.name ?? '',
+            group: '',
           });
           return;
         }
@@ -233,7 +241,7 @@ export default function Sidebar() {
     clearAll();
     setGridSize(layout.gridCols, layout.gridRows);
     for (const bin of layout.bins) {
-      addBin(bin);
+      addBin({ ...bin, group: (bin as any).group || '' });
     }
     setShowLoadDropdown(false);
     showToast(`Loaded "${layout.name}"`);
@@ -260,6 +268,7 @@ export default function Sidebar() {
             magnets: false, screws: false,
             dividersX: 0, dividersY: 0,
             color: '', label: '',
+            group: '',
           });
           placed++;
         }
@@ -380,6 +389,211 @@ export default function Sidebar() {
     win.document.close();
   }
 
+  // ── JSON Export/Import ──
+
+  function handleExportJSON() {
+    const { bins: allBins, gridCols: gc, gridRows: gr } = useStore.getState();
+    const data = {
+      version: '1.0',
+      gridCols: gc,
+      gridRows: gr,
+      bins: allBins.map(({ id, ...rest }) => rest),
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gridfinity-layout-${gc}x${gr}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('JSON exported');
+  }
+
+  function handleImportJSON(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string);
+        if (!data.gridCols || !data.gridRows || !Array.isArray(data.bins)) {
+          showToast('Invalid layout file');
+          return;
+        }
+        clearAll();
+        setGridSize(data.gridCols, data.gridRows);
+        for (const bin of data.bins) {
+          addBin({ ...bin, group: bin.group || '' });
+        }
+        showToast(`Imported ${data.bins.length} bins`);
+      } catch {
+        showToast('Failed to parse JSON');
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be re-imported
+    e.target.value = '';
+  }
+
+  // ── Template loading ──
+
+  function handleLoadTemplate(template: LayoutTemplate) {
+    clearAll();
+    setGridSize(template.gridCols, template.gridRows);
+    for (const b of template.bins) {
+      addBin({
+        x: b.x, y: b.y, w: b.w, d: b.d, h: b.h,
+        cornerRadius: GF.BIN_CORNER_RADIUS,
+        wallThickness: GF.WALL_THICKNESS,
+        bottomThickness: GF.BOTTOM_THICKNESS,
+        stackingLip: false, labelShelf: false, labelWidth: GF.LABEL_DEFAULT_WIDTH,
+        magnets: false, screws: false,
+        dividersX: b.dividersX, dividersY: b.dividersY,
+        color: '', label: b.label, group: b.group || '',
+      });
+    }
+    setShowTemplates(false);
+    showToast(`Loaded "${template.name}"`);
+  }
+
+  // ── GitHub Gist export (token encrypted in localStorage) ──
+
+  const GIST_TOKEN_KEY = 'gridfinity-gh-token-enc';
+
+  async function deriveKey(): Promise<CryptoKey> {
+    const salt = new TextEncoder().encode('gridfinity-gist-v1-' + window.location.origin);
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', salt, 'PBKDF2', false, ['deriveKey'],
+    );
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt'],
+    );
+  }
+
+  async function encryptToken(token: string): Promise<string> {
+    const key = await deriveKey();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const enc = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      new TextEncoder().encode(token),
+    );
+    const buf = new Uint8Array(iv.length + new Uint8Array(enc).length);
+    buf.set(iv);
+    buf.set(new Uint8Array(enc), iv.length);
+    return btoa(String.fromCharCode(...buf));
+  }
+
+  async function decryptToken(stored: string): Promise<string | null> {
+    try {
+      const raw = Uint8Array.from(atob(stored), (c) => c.charCodeAt(0));
+      const iv = raw.slice(0, 12);
+      const data = raw.slice(12);
+      const key = await deriveKey();
+      const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+      return new TextDecoder().decode(dec);
+    } catch {
+      return null;
+    }
+  }
+
+  function handleGistExport() {
+    setShowGistConfirm(true);
+  }
+
+  async function handleGistConfirmed() {
+    setShowGistConfirm(false);
+
+    const stored = localStorage.getItem(GIST_TOKEN_KEY);
+    const token = stored ? await decryptToken(stored) : null;
+
+    if (!token) {
+      setTokenInput('');
+      setShowTokenModal(true);
+      return;
+    }
+
+    await doGistUpload(token);
+  }
+
+  async function doGistUpload(token: string) {
+    const { bins: allBins, gridCols: gc, gridRows: gr } = useStore.getState();
+    const data = {
+      version: '1.0',
+      gridCols: gc,
+      gridRows: gr,
+      bins: allBins.map(({ id, ...rest }) => rest),
+      exportedAt: new Date().toISOString(),
+    };
+    const content = JSON.stringify(data, null, 2);
+
+    try {
+      const res = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          description: `Gridfinity Layout — ${gc}x${gr} grid, ${allBins.length} bins`,
+          public: true,
+          files: {
+            [`gridfinity-${gc}x${gr}.json`]: { content },
+          },
+        }),
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem(GIST_TOKEN_KEY);
+        showToast('Invalid token — cleared');
+        return;
+      }
+
+      if (!res.ok) {
+        showToast(`Gist failed (${res.status})`);
+        return;
+      }
+
+      // Token works — encrypt and save
+      const encrypted = await encryptToken(token);
+      localStorage.setItem(GIST_TOKEN_KEY, encrypted);
+
+      const gist = await res.json();
+      const gistUrl = gist.html_url;
+
+      try {
+        await navigator.clipboard.writeText(gistUrl);
+        showToast('Gist created! URL copied');
+      } catch {
+        showToast('Gist created!');
+        window.open(gistUrl, '_blank');
+      }
+    } catch {
+      showToast('Network error');
+    }
+  }
+
+  async function handleTokenSubmit() {
+    const token = tokenInput.trim();
+    if (!token) return;
+    setShowTokenModal(false);
+    await doGistUpload(token);
+  }
+
+  // ── Drag bin from sidebar ──
+
+  function handleDragStartPreset(e: React.DragEvent, preset: typeof BIN_PRESETS[number]) {
+    e.dataTransfer.setData('application/gridfinity-preset', JSON.stringify(preset));
+    e.dataTransfer.effectAllowed = 'copy';
+    // Store size globally so GridCanvas2D can read it during dragover
+    (window as any).__gridfinityDragPreset = { w: preset.w, d: preset.d };
+  }
+
   function handleCopyLink() {
     const url = encodeLayoutToURL();
     try {
@@ -429,10 +643,157 @@ export default function Sidebar() {
             background: 'rgba(59, 130, 246, 0.85)',
             backdropFilter: 'blur(8px)',
             color: '#fff',
-            zIndex: 9999, padding: '10px 20px', fontSize: 13,
+            zIndex: 9999, padding: '10px 20px', fontSize: 11,
           }}
         >
           {toast}
+        </div>
+      )}
+
+      {/* GitHub Token Modal */}
+      {showTokenModal && (
+        <div
+          className="fixed inset-0 flex items-center justify-center"
+          style={{ zIndex: 10000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowTokenModal(false)}
+        >
+          <div
+            className="rounded-xl shadow-2xl"
+            style={{
+              width: 380, padding: 24,
+              background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-bold" style={{ fontSize: 15, marginBottom: 12, color: 'var(--text-primary)' }}>
+              GitHub Token
+            </h3>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6, lineHeight: 1.5 }}>
+              A Personal Access Token with <strong style={{ color: 'var(--accent)' }}>gist</strong> scope is required.
+            </p>
+            <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 14 }}>
+              Create one at{' '}
+              <a
+                href="https://github.com/settings/tokens/new?scopes=gist&description=Gridfinity+Builder"
+                target="_blank" rel="noopener"
+                style={{ color: 'var(--accent)', textDecoration: 'underline' }}
+              >
+                github.com/settings/tokens
+              </a>
+            </p>
+            <input
+              type="password"
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleTokenSubmit(); if (e.key === 'Escape') setShowTokenModal(false); }}
+              placeholder="ghp_xxxxxxxxxxxx"
+              autoFocus
+              className="w-full rounded"
+              style={{
+                height: 38, padding: '8px 12px', fontSize: 13,
+                background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
+                color: 'var(--text-primary)', fontFamily: 'JetBrains Mono, monospace',
+              }}
+            />
+            <p style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 6, opacity: 0.7 }}>
+              Encrypted with AES-256 before saving to localStorage.
+            </p>
+            <div className="flex justify-end" style={{ gap: 8, marginTop: 16 }}>
+              <button
+                onClick={() => setShowTokenModal(false)}
+                className="rounded transition-colors hover:brightness-125"
+                style={{
+                  padding: '8px 16px', fontSize: 13,
+                  background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleTokenSubmit}
+                disabled={!tokenInput.trim()}
+                className="rounded font-medium transition-colors hover:brightness-125 disabled:opacity-30"
+                style={{
+                  padding: '8px 20px', fontSize: 13,
+                  background: 'var(--accent)', color: 'var(--bg-primary)',
+                }}
+              >
+                Save & Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Gist Confirmation Modal */}
+      {showGistConfirm && (
+        <div
+          className="fixed inset-0 flex items-center justify-center"
+          style={{ zIndex: 10000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowGistConfirm(false)}
+        >
+          <div
+            className="rounded-xl shadow-2xl"
+            style={{
+              width: 380, padding: 24,
+              background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-bold" style={{ fontSize: 15, marginBottom: 12, color: 'var(--text-primary)' }}>
+              Share as Public Gist
+            </h3>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 12 }}>
+              This will create a <strong style={{ color: 'var(--text-primary)' }}>public</strong> GitHub Gist
+              with your current layout:
+            </p>
+            <div
+              className="rounded"
+              style={{
+                padding: '10px 14px', marginBottom: 14,
+                background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
+                fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-secondary)',
+              }}
+            >
+              <div className="flex justify-between" style={{ marginBottom: 4 }}>
+                <span>Grid</span>
+                <span style={{ color: 'var(--text-primary)' }}>{gridCols} x {gridRows}</span>
+              </div>
+              <div className="flex justify-between" style={{ marginBottom: 4 }}>
+                <span>Bins</span>
+                <span style={{ color: 'var(--text-primary)' }}>{bins.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Visibility</span>
+                <span style={{ color: '#ffaa00' }}>Public</span>
+              </div>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--text-secondary)', opacity: 0.7, marginBottom: 16 }}>
+              Anyone with the link will be able to see your layout.
+            </p>
+            <div className="flex justify-end" style={{ gap: 8 }}>
+              <button
+                onClick={() => setShowGistConfirm(false)}
+                className="rounded transition-colors hover:brightness-125"
+                style={{
+                  padding: '8px 16px', fontSize: 13,
+                  background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGistConfirmed}
+                className="rounded font-medium transition-colors hover:brightness-125"
+                style={{
+                  padding: '8px 20px', fontSize: 13,
+                  background: 'var(--accent)', color: 'var(--bg-primary)',
+                }}
+              >
+                Share
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -447,7 +808,7 @@ export default function Sidebar() {
                 onClick={() => setGridSize(p.cols, p.rows)}
                 className="transition-colors hover:brightness-125"
                 style={{
-                  padding: '6px 12px', borderRadius: 6, fontSize: 12,
+                  padding: '5px 10px', borderRadius: 6, fontSize: 11,
                   background: active ? 'var(--accent)' : 'var(--bg-tertiary)',
                   color: active ? 'var(--bg-primary)' : 'var(--text-secondary)',
                   border: '1px solid var(--border)',
@@ -460,24 +821,24 @@ export default function Sidebar() {
           })}
         </div>
         <div className="flex items-center" style={{ gap: 8 }}>
-          <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Grid:</label>
+          <label style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Grid:</label>
           <input
             type="number" min={1} max={20} value={gridCols}
             onChange={(e) => setGridSize(Number(e.target.value), gridRows)}
             className="rounded text-center"
             style={{
-              width: 52, height: 32, padding: '4px 8px', fontSize: 14,
+              width: 46, height: 28, padding: '4px 6px', fontSize: 11,
               background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)',
               fontFamily: 'JetBrains Mono, monospace',
             }}
           />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>x</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>x</span>
           <input
             type="number" min={1} max={20} value={gridRows}
             onChange={(e) => setGridSize(gridCols, Number(e.target.value))}
             className="rounded text-center"
             style={{
-              width: 52, height: 32, padding: '4px 8px', fontSize: 14,
+              width: 46, height: 28, padding: '4px 6px', fontSize: 11,
               background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)',
               fontFamily: 'JetBrains Mono, monospace',
             }}
@@ -490,12 +851,12 @@ export default function Sidebar() {
       <Section title="ADD BIN">
         {dragState.mode === 'placing' ? (
           <div className="text-center" style={{ padding: '12px 0', color: 'var(--accent)' }}>
-            <div style={{ marginBottom: 10, fontSize: 13 }}>Click on grid to place bin...</div>
+            <div style={{ marginBottom: 10, fontSize: 11 }}>Click on grid to place bin...</div>
             <button
               onClick={() => useStore.getState().cancelPlacing()}
               className="rounded transition-colors hover:brightness-125"
               style={{
-                padding: '8px 20px', fontSize: 13,
+                padding: '8px 20px', fontSize: 11,
                 background: 'var(--bg-tertiary)', color: 'var(--danger)', border: '1px solid var(--border)',
               }}
             >
@@ -508,7 +869,7 @@ export default function Sidebar() {
               onClick={() => handleAddBin()}
               className="w-full rounded font-semibold transition-colors hover:brightness-125"
               style={{
-                height: 40, fontSize: 14, marginBottom: 12,
+                height: 30, fontSize: 11, marginBottom: 10,
                 background: 'var(--accent)', color: 'var(--bg-primary)',
               }}
             >
@@ -519,14 +880,18 @@ export default function Sidebar() {
                 <div key={p.name} className="flex" style={{ gap: 6 }}>
                   <button
                     onClick={() => handleAddBin(p)}
+                    draggable
+                    onDragStart={(e) => handleDragStartPreset(e, p)}
                     className="flex-1 rounded text-left transition-colors hover:brightness-125"
                     style={{
-                      minHeight: 40, padding: '8px 12px', fontSize: 13,
+                      minHeight: 34, padding: '6px 10px', fontSize: 11,
                       background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)',
+                      cursor: 'grab',
                     }}
+                    title="Click to place, or drag to grid"
                   >
                     {p.name}
-                    <span style={{ opacity: 0.4, marginLeft: 8, fontSize: 11 }}>
+                    <span style={{ opacity: 0.4, marginLeft: 8, fontSize: 10 }}>
                       {p.w}x{p.d}x{p.h}u
                     </span>
                   </button>
@@ -534,7 +899,7 @@ export default function Sidebar() {
                     onClick={() => handleQuickAdd(p)}
                     className="rounded transition-colors hover:brightness-125 flex items-center justify-center shrink-0"
                     style={{
-                      width: 40, minHeight: 40, fontSize: 18, fontWeight: 600,
+                      width: 34, minHeight: 34, fontSize: 16, fontWeight: 600,
                       background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--accent)',
                     }}
                     title="Quick add (auto-place)"
@@ -549,49 +914,101 @@ export default function Sidebar() {
       </Section>
 
       {/* Bin List */}
-      <Section title={`BINS (${bins.length})`}>
-        {bins.length === 0 ? (
-          <p className="text-center" style={{ padding: '12px 0', opacity: 0.4, fontSize: 13 }}>No bins placed yet</p>
-        ) : (
-          <div className="flex flex-col" style={{ gap: 4 }}>
-            {bins.map((bin) => {
-              const isSelected = selectedBinId === bin.id;
-              return (
-                <div
-                  key={bin.id}
-                  onClick={() => selectBin(bin.id)}
-                  className="flex items-center rounded cursor-pointer transition-colors"
-                  style={{
-                    gap: 10, padding: '6px 12px', minHeight: 36,
-                    background: isSelected ? 'var(--bg-tertiary)' : 'transparent',
-                    border: isSelected ? '1px solid var(--accent)' : '1px solid transparent',
-                  }}
-                  onMouseEnter={(e) => { if (!isSelected) (e.currentTarget.style.background = 'rgba(255,255,255,0.03)'); }}
-                  onMouseLeave={(e) => { if (!isSelected) (e.currentTarget.style.background = 'transparent'); }}
-                >
-                  <div className="shrink-0" style={{ width: 14, height: 14, borderRadius: 3, background: bin.color }} />
-                  <div className="flex-1 truncate" style={{ fontSize: 13 }}>
-                    {bin.label || 'Bin'}
-                    <span style={{ fontSize: 11, opacity: 0.45, marginLeft: 6 }}>
-                      {bin.w}x{bin.d}x{bin.h}u
-                    </span>
-                  </div>
-                  <span style={{ fontSize: 11, opacity: 0.4 }}>
-                    ({bin.x},{bin.y})
-                  </span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); removeBin(bin.id); }}
-                    className="opacity-40 hover:opacity-100 transition-opacity flex items-center justify-center"
-                    style={{ color: 'var(--danger)', width: 20, height: 20, fontSize: 14 }}
-                  >
-                    x
-                  </button>
-                </div>
-              );
-            })}
+      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <button
+          onClick={() => setBinsCollapsed(!binsCollapsed)}
+          className="w-full flex items-center justify-between transition-colors"
+          style={{
+            padding: '10px 16px',
+            background: binsCollapsed ? 'rgba(0, 212, 170, 0.06)' : 'none',
+            border: 'none', cursor: 'pointer',
+            borderLeft: binsCollapsed ? '3px solid var(--accent)' : '3px solid transparent',
+          }}
+        >
+          <div className="flex items-center" style={{ gap: 8 }}>
+            <h3
+              className="font-bold uppercase"
+              style={{
+                fontSize: 12, letterSpacing: '0.05em', margin: 0,
+                color: binsCollapsed ? 'var(--accent)' : 'rgba(255,255,255,0.5)',
+              }}
+            >
+              BINS
+            </h3>
+            <span
+              className="rounded-full font-bold"
+              style={{
+                fontSize: 10, minWidth: 20, height: 18, lineHeight: '18px',
+                textAlign: 'center', padding: '0 6px',
+                background: bins.length > 0 ? 'var(--accent)' : 'var(--bg-tertiary)',
+                color: bins.length > 0 ? 'var(--bg-primary)' : 'var(--text-secondary)',
+              }}
+            >
+              {bins.length}
+            </span>
+          </div>
+          <span style={{
+            fontSize: 10, color: binsCollapsed ? 'var(--accent)' : 'var(--text-secondary)',
+            transition: 'transform 0.2s',
+            display: 'inline-block', transform: binsCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+          }}>
+            ▼
+          </span>
+        </button>
+        {!binsCollapsed && (
+          <div style={{ padding: '0 16px 12px' }}>
+            {bins.length === 0 ? (
+              <p className="text-center" style={{ padding: '12px 0', opacity: 0.4, fontSize: 11 }}>No bins placed yet</p>
+            ) : (
+              <div className="flex flex-col" style={{ gap: 4 }}>
+                {bins.map((bin) => {
+                  const isSelected = selectedBinId === bin.id;
+                  return (
+                    <div
+                      key={bin.id}
+                      onClick={() => selectBin(bin.id)}
+                      className="flex items-center rounded cursor-pointer transition-colors"
+                      style={{
+                        gap: 8, padding: '5px 10px', minHeight: 30,
+                        background: isSelected ? 'var(--bg-tertiary)' : 'transparent',
+                        border: isSelected ? '1px solid var(--accent)' : '1px solid transparent',
+                      }}
+                      onMouseEnter={(e) => { if (!isSelected) (e.currentTarget.style.background = 'rgba(255,255,255,0.03)'); }}
+                      onMouseLeave={(e) => { if (!isSelected) (e.currentTarget.style.background = 'transparent'); }}
+                    >
+                      <div className="shrink-0" style={{ width: 14, height: 14, borderRadius: 3, background: bin.color }} />
+                      {bin.group && (() => {
+                        const grp = BIN_GROUPS.find((g) => g.id === bin.group);
+                        return grp ? (
+                          <div className="shrink-0" title={grp.label}
+                            style={{ width: 8, height: 8, borderRadius: '50%', background: grp.color }}
+                          />
+                        ) : null;
+                      })()}
+                      <div className="flex-1 truncate" style={{ fontSize: 11 }}>
+                        {bin.label || 'Bin'}
+                        <span style={{ fontSize: 10, opacity: 0.45, marginLeft: 6 }}>
+                          {bin.w}x{bin.d}x{bin.h}u
+                        </span>
+                      </div>
+                      <span style={{ fontSize: 10, opacity: 0.4 }}>
+                        ({bin.x},{bin.y})
+                      </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeBin(bin.id); }}
+                        className="opacity-40 hover:opacity-100 transition-opacity flex items-center justify-center"
+                        style={{ color: 'var(--danger)', width: 20, height: 20, fontSize: 14 }}
+                      >
+                        x
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
-      </Section>
+      </div>
 
       {/* Configurator */}
       {selectedBin && <BinConfigurator bin={selectedBin} />}
@@ -611,14 +1028,14 @@ export default function Sidebar() {
                 autoFocus
                 className="flex-1 rounded"
                 style={{
-                  padding: '8px 12px', fontSize: 13, height: 38,
+                  padding: '8px 12px', fontSize: 11, height: 32,
                   background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)',
                 }}
               />
               <button
                 onClick={handleSaveLayout}
                 className="rounded font-medium hover:brightness-125"
-                style={{ padding: '8px 16px', fontSize: 13, height: 38, background: 'var(--accent)', color: 'var(--bg-primary)' }}
+                style={{ padding: '8px 16px', fontSize: 11, height: 32, background: 'var(--accent)', color: 'var(--bg-primary)' }}
               >
                 Save
               </button>
@@ -629,7 +1046,7 @@ export default function Sidebar() {
               disabled={bins.length === 0}
               className="w-full rounded font-medium transition-colors hover:brightness-125 disabled:opacity-30"
               style={{
-                height: 38, fontSize: 13,
+                height: 32, fontSize: 11,
                 background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)',
               }}
             >
@@ -644,7 +1061,7 @@ export default function Sidebar() {
               disabled={getSavedLayouts().length === 0}
               className="w-full rounded font-medium transition-colors hover:brightness-125 disabled:opacity-30"
               style={{
-                height: 38, fontSize: 13,
+                height: 32, fontSize: 11,
                 background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)',
               }}
             >
@@ -663,7 +1080,7 @@ export default function Sidebar() {
                     onClick={() => handleLoadLayout(layout)}
                   >
                     <div className="flex-1">
-                      <div className="font-medium" style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+                      <div className="font-medium" style={{ fontSize: 11, color: 'var(--text-primary)' }}>
                         {layout.name}
                       </div>
                       <div style={{ fontSize: 11, opacity: 0.5 }}>
@@ -673,7 +1090,7 @@ export default function Sidebar() {
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDeleteLayout(layout.name); }}
                       className="opacity-40 hover:opacity-100"
-                      style={{ color: 'var(--danger)', fontSize: 13 }}
+                      style={{ color: 'var(--danger)', fontSize: 11 }}
                     >
                       x
                     </button>
@@ -689,7 +1106,7 @@ export default function Sidebar() {
             disabled={bins.length === 0}
             className="w-full rounded font-medium transition-colors hover:brightness-125 disabled:opacity-30"
             style={{
-              height: 38, fontSize: 13,
+              height: 32, fontSize: 11,
               background: 'var(--bg-tertiary)', color: 'var(--accent)', border: '1px solid var(--border)',
             }}
           >
@@ -698,38 +1115,117 @@ export default function Sidebar() {
         </div>
       </Section>
 
+      {/* Templates */}
+      <Section title="TEMPLATES">
+        <button
+          onClick={() => setShowTemplates(!showTemplates)}
+          className="w-full rounded font-medium transition-colors hover:brightness-125"
+          style={{
+            height: 32, fontSize: 11,
+            background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)',
+          }}
+        >
+          {showTemplates ? 'Hide Templates' : `Browse Templates (${LAYOUT_TEMPLATES.length})`}
+        </button>
+        {showTemplates && (
+          <div className="flex flex-col" style={{ gap: 6, marginTop: 8 }}>
+            {LAYOUT_TEMPLATES.map((t) => (
+              <button
+                key={t.name}
+                onClick={() => handleLoadTemplate(t)}
+                className="w-full rounded text-left transition-colors hover:brightness-125"
+                style={{
+                  padding: '8px 12px', fontSize: 11,
+                  background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)',
+                }}
+              >
+                <div className="font-medium">{t.name}</div>
+                <div style={{ fontSize: 11, opacity: 0.5 }}>
+                  {t.gridCols}x{t.gridRows} grid, {t.bins.length} bins — {t.description}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      {/* Export / Import JSON */}
+      <Section title="EXPORT / IMPORT">
+        <div className="flex flex-col" style={{ gap: 6 }}>
+          <button
+            onClick={handleExportJSON}
+            disabled={bins.length === 0}
+            className="w-full rounded font-medium transition-colors hover:brightness-125 disabled:opacity-30"
+            style={{
+              height: 30, fontSize: 11,
+              background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)',
+            }}
+          >
+            Export JSON
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full rounded font-medium transition-colors hover:brightness-125"
+            style={{
+              height: 30, fontSize: 11,
+              background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)',
+            }}
+          >
+            Import JSON
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImportJSON}
+            style={{ display: 'none' }}
+          />
+          <button
+            onClick={handleGistExport}
+            disabled={bins.length === 0}
+            className="w-full rounded font-medium transition-colors hover:brightness-125 disabled:opacity-30"
+            style={{
+              height: 30, fontSize: 11,
+              background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)',
+            }}
+          >
+            Share as GitHub Gist
+          </button>
+        </div>
+      </Section>
+
       {/* Auto-fill */}
       <Section title="AUTO-FILL">
         <div className="flex items-center" style={{ gap: 6, marginBottom: 8 }}>
-          <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Size:</label>
+          <label style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Size:</label>
           <input
             type="number" min={1} max={10} value={autoFillSize.w}
             onChange={(e) => setAutoFillSize((s) => ({ ...s, w: Math.max(1, Math.min(10, Number(e.target.value))) }))}
             className="rounded text-center"
             style={{
-              width: 42, height: 30, fontSize: 13,
+              width: 42, height: 30, fontSize: 11,
               background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)',
               fontFamily: 'JetBrains Mono, monospace',
             }}
           />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>x</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>x</span>
           <input
             type="number" min={1} max={10} value={autoFillSize.d}
             onChange={(e) => setAutoFillSize((s) => ({ ...s, d: Math.max(1, Math.min(10, Number(e.target.value))) }))}
             className="rounded text-center"
             style={{
-              width: 42, height: 30, fontSize: 13,
+              width: 42, height: 30, fontSize: 11,
               background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)',
               fontFamily: 'JetBrains Mono, monospace',
             }}
           />
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>x</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>x</span>
           <input
             type="number" min={1} max={12} value={autoFillSize.h}
             onChange={(e) => setAutoFillSize((s) => ({ ...s, h: Math.max(1, Math.min(12, Number(e.target.value))) }))}
             className="rounded text-center"
             style={{
-              width: 42, height: 30, fontSize: 13,
+              width: 42, height: 30, fontSize: 11,
               background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)',
               fontFamily: 'JetBrains Mono, monospace',
             }}
@@ -740,7 +1236,7 @@ export default function Sidebar() {
           onClick={handleAutoFill}
           className="w-full rounded font-medium transition-colors hover:brightness-125"
           style={{
-            height: 36, fontSize: 13,
+            height: 30, fontSize: 11,
             background: 'var(--accent)', color: 'var(--bg-primary)',
           }}
         >
@@ -805,7 +1301,7 @@ export default function Sidebar() {
             disabled={bins.length === 0}
             className="w-full rounded font-medium transition-colors hover:brightness-125 disabled:opacity-30"
             style={{
-              height: 36, fontSize: 13,
+              height: 30, fontSize: 11,
               background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)',
             }}
           >
@@ -816,7 +1312,7 @@ export default function Sidebar() {
             disabled={bins.length === 0}
             className="w-full rounded font-medium transition-colors hover:brightness-125 disabled:opacity-30"
             style={{
-              height: 36, fontSize: 13,
+              height: 30, fontSize: 11,
               background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)',
             }}
           >
@@ -832,7 +1328,7 @@ export default function Sidebar() {
             onClick={forceUpdate}
             className="w-full rounded font-medium transition-colors hover:brightness-125"
             style={{
-              height: 36, fontSize: 12, marginBottom: 10,
+              height: 30, fontSize: 12, marginBottom: 10,
               background: 'rgba(59, 130, 246, 0.15)',
               color: '#60a5fa',
               border: '1px solid rgba(59, 130, 246, 0.3)',
@@ -860,7 +1356,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div style={{ padding: 16, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
       <h3
         className="font-bold uppercase"
-        style={{ fontSize: 11, letterSpacing: '0.05em', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}
+        style={{ fontSize: 12, letterSpacing: '0.05em', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}
       >
         {title}
       </h3>

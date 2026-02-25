@@ -1,6 +1,6 @@
 import { useRef, useCallback, memo } from 'react';
 import { useStore, type Bin } from '../store/useStore';
-import { GF } from '../gridfinity/constants';
+import { GF, BIN_GROUPS } from '../gridfinity/constants';
 
 interface Props {
   bin: Bin;
@@ -150,6 +150,41 @@ export default memo(function BinConfigurator({ bin }: Props) {
             role="radio" aria-checked={bin.color === c} aria-label={`Color ${c}`}
           />
         ))}
+      </div>
+
+      <SectionHeader sub>GROUP</SectionHeader>
+      <div className="flex flex-wrap" style={{ gap: 4, marginTop: 4 }}>
+        {BIN_GROUPS.map((g) => {
+          const isActive = (bin.group || '') === g.id;
+          return (
+            <button
+              key={g.id}
+              onClick={() => update({ group: g.id })}
+              className="rounded transition-colors hover:brightness-125"
+              style={{
+                padding: '4px 10px', fontSize: 11,
+                background: isActive
+                  ? (g.color ? g.color + '33' : 'var(--bg-tertiary)')
+                  : 'var(--bg-tertiary)',
+                border: isActive
+                  ? `1px solid ${g.color || 'var(--accent)'}`
+                  : '1px solid var(--border)',
+                color: isActive
+                  ? (g.color || 'var(--text-primary)')
+                  : 'var(--text-secondary)',
+                fontWeight: isActive ? 600 : 400,
+              }}
+            >
+              {g.color && (
+                <span style={{
+                  display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
+                  background: g.color, marginRight: 4, verticalAlign: 'middle',
+                }} />
+              )}
+              {g.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

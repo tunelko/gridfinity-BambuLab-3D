@@ -20,6 +20,7 @@ export interface Bin {
   dividersY: number;
   color: string;
   label: string;
+  group: string;
 }
 
 export type ViewMode = '2d' | '3d' | 'split';

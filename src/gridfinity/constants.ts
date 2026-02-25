@@ -48,3 +48,98 @@ export const BIN_PRESETS = [
   { name: 'SFP Tray',    w: 2, d: 1, h: 2, stackingLip: false, labelShelf: false, magnets: false, screws: false, dividersX: 5, dividersY: 0 },
   { name: 'Cable Mgmt',  w: 1, d: 6, h: 3, stackingLip: false, labelShelf: false, magnets: false, screws: false, dividersX: 0, dividersY: 0 },
 ];
+
+// ── Bin Groups / Tags ──
+
+export const BIN_GROUPS: { id: string; label: string; color: string }[] = [
+  { id: '',            label: 'None',        color: '' },
+  { id: 'screws',      label: 'Screws',      color: '#4488ff' },
+  { id: 'tools',       label: 'Tools',       color: '#ff6644' },
+  { id: 'cables',      label: 'Cables',      color: '#ffaa00' },
+  { id: 'electronics', label: 'Electronics', color: '#aa44ff' },
+  { id: 'parts',       label: 'Parts',       color: '#00d4aa' },
+  { id: 'office',      label: 'Office',      color: '#ff44aa' },
+  { id: 'network',     label: 'Network',     color: '#44ddff' },
+];
+
+// ── Layout Templates ──
+
+export interface LayoutTemplate {
+  name: string;
+  description: string;
+  gridCols: number;
+  gridRows: number;
+  bins: { x: number; y: number; w: number; d: number; h: number; label: string; group: string; dividersX: number; dividersY: number }[];
+}
+
+export const LAYOUT_TEMPLATES: LayoutTemplate[] = [
+  {
+    name: 'IKEA Alex Drawer',
+    description: '7x14 grid for IKEA ALEX desk drawer',
+    gridCols: 7, gridRows: 14,
+    bins: [
+      { x: 0, y: 0, w: 2, d: 2, h: 3, label: 'Pens', group: 'office', dividersX: 0, dividersY: 0 },
+      { x: 2, y: 0, w: 2, d: 2, h: 3, label: 'Clips', group: 'office', dividersX: 2, dividersY: 2 },
+      { x: 4, y: 0, w: 3, d: 2, h: 3, label: 'Notes', group: 'office', dividersX: 0, dividersY: 0 },
+      { x: 0, y: 2, w: 1, d: 1, h: 3, label: 'USB', group: 'cables', dividersX: 0, dividersY: 0 },
+      { x: 1, y: 2, w: 1, d: 1, h: 3, label: 'SD Cards', group: 'electronics', dividersX: 0, dividersY: 0 },
+      { x: 2, y: 2, w: 5, d: 3, h: 3, label: 'Notebooks', group: 'office', dividersX: 0, dividersY: 0 },
+      { x: 0, y: 3, w: 2, d: 4, h: 3, label: 'Cables', group: 'cables', dividersX: 0, dividersY: 0 },
+      { x: 2, y: 5, w: 5, d: 2, h: 3, label: 'Misc', group: 'parts', dividersX: 3, dividersY: 0 },
+    ],
+  },
+  {
+    name: 'Electronics Bench',
+    description: '6x6 grid for electronics workspace',
+    gridCols: 6, gridRows: 6,
+    bins: [
+      { x: 0, y: 0, w: 1, d: 1, h: 3, label: 'Resistors', group: 'electronics', dividersX: 0, dividersY: 0 },
+      { x: 1, y: 0, w: 1, d: 1, h: 3, label: 'Capacitors', group: 'electronics', dividersX: 0, dividersY: 0 },
+      { x: 2, y: 0, w: 1, d: 1, h: 3, label: 'LEDs', group: 'electronics', dividersX: 0, dividersY: 0 },
+      { x: 3, y: 0, w: 1, d: 1, h: 3, label: 'ICs', group: 'electronics', dividersX: 0, dividersY: 0 },
+      { x: 4, y: 0, w: 2, d: 2, h: 3, label: 'Arduino', group: 'electronics', dividersX: 0, dividersY: 0 },
+      { x: 0, y: 1, w: 2, d: 2, h: 6, label: 'Soldering', group: 'tools', dividersX: 0, dividersY: 0 },
+      { x: 2, y: 1, w: 2, d: 1, h: 2, label: 'Connectors', group: 'electronics', dividersX: 3, dividersY: 0 },
+      { x: 0, y: 3, w: 3, d: 3, h: 2, label: 'Wire Spools', group: 'cables', dividersX: 2, dividersY: 2 },
+      { x: 3, y: 3, w: 1, d: 3, h: 6, label: 'Screwdrivers', group: 'tools', dividersX: 0, dividersY: 0 },
+      { x: 4, y: 2, w: 2, d: 2, h: 3, label: 'Multimeter', group: 'tools', dividersX: 0, dividersY: 0 },
+      { x: 4, y: 4, w: 2, d: 2, h: 2, label: 'Tape & Glue', group: 'tools', dividersX: 1, dividersY: 0 },
+    ],
+  },
+  {
+    name: 'Tool Wall',
+    description: '8x4 grid for workshop tool organizer',
+    gridCols: 8, gridRows: 4,
+    bins: [
+      { x: 0, y: 0, w: 2, d: 2, h: 6, label: 'Drill Bits', group: 'tools', dividersX: 3, dividersY: 0 },
+      { x: 2, y: 0, w: 1, d: 4, h: 6, label: 'Screwdriver', group: 'tools', dividersX: 0, dividersY: 0 },
+      { x: 3, y: 0, w: 1, d: 4, h: 6, label: 'Allen Keys', group: 'tools', dividersX: 0, dividersY: 0 },
+      { x: 4, y: 0, w: 2, d: 2, h: 3, label: 'M3 Screws', group: 'screws', dividersX: 1, dividersY: 1 },
+      { x: 6, y: 0, w: 2, d: 2, h: 3, label: 'M5 Screws', group: 'screws', dividersX: 1, dividersY: 1 },
+      { x: 0, y: 2, w: 2, d: 2, h: 3, label: 'Nuts & Bolts', group: 'screws', dividersX: 2, dividersY: 2 },
+      { x: 4, y: 2, w: 2, d: 2, h: 3, label: 'Washers', group: 'screws', dividersX: 1, dividersY: 1 },
+      { x: 6, y: 2, w: 2, d: 2, h: 2, label: 'Zip Ties', group: 'cables', dividersX: 0, dividersY: 0 },
+    ],
+  },
+  {
+    name: 'Server Rack 1U',
+    description: '10x8 grid for 19" rack tray organizer',
+    gridCols: 10, gridRows: 8,
+    bins: [
+      { x: 0, y: 0, w: 2, d: 1, h: 2, label: 'SFP Modules', group: 'network', dividersX: 5, dividersY: 0 },
+      { x: 2, y: 0, w: 2, d: 1, h: 2, label: 'SFP Modules', group: 'network', dividersX: 5, dividersY: 0 },
+      { x: 4, y: 0, w: 2, d: 2, h: 3, label: 'RJ45 Plugs', group: 'network', dividersX: 2, dividersY: 2 },
+      { x: 6, y: 0, w: 2, d: 2, h: 3, label: 'Keystones', group: 'network', dividersX: 1, dividersY: 1 },
+      { x: 8, y: 0, w: 2, d: 4, h: 6, label: 'Patch Cables', group: 'cables', dividersX: 0, dividersY: 0 },
+      { x: 0, y: 1, w: 4, d: 3, h: 2, label: 'SSDs 2.5"', group: 'electronics', dividersX: 3, dividersY: 2 },
+      { x: 4, y: 2, w: 4, d: 2, h: 3, label: 'Drive Caddies', group: 'parts', dividersX: 3, dividersY: 0 },
+      { x: 0, y: 4, w: 2, d: 2, h: 3, label: 'M5 Cage Nuts', group: 'screws', dividersX: 1, dividersY: 1 },
+      { x: 2, y: 4, w: 2, d: 2, h: 3, label: 'M6 Bolts', group: 'screws', dividersX: 1, dividersY: 1 },
+      { x: 4, y: 4, w: 2, d: 2, h: 2, label: 'USB Dongles', group: 'electronics', dividersX: 3, dividersY: 0 },
+      { x: 6, y: 4, w: 2, d: 2, h: 2, label: 'Labels', group: 'office', dividersX: 0, dividersY: 0 },
+      { x: 0, y: 6, w: 3, d: 2, h: 2, label: 'Velcro Straps', group: 'cables', dividersX: 0, dividersY: 0 },
+      { x: 3, y: 6, w: 3, d: 2, h: 2, label: 'Cable Ties', group: 'cables', dividersX: 0, dividersY: 0 },
+      { x: 6, y: 6, w: 4, d: 2, h: 3, label: 'Misc Tools', group: 'tools', dividersX: 2, dividersY: 0 },
+    ],
+  },
+];
