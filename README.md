@@ -6,10 +6,9 @@ Built for makers, 3D printing enthusiasts, and anyone who wants to organize thei
 
 > Gridfinity is an open-source modular storage system created by [Zack Freedman](https://www.youtube.com/@ZackFreedman). This tool helps you design custom bin layouts and export them as 3MF files ready for slicing.
 
-| | |
-|---|---|
-| **Live Demo** | [gridfinity.securedev.codes](https://gridfinity.securedev.codes/) |
-| **Documentation** | [tunelko-gridfinity-bambulab-3d.mintlify.app](https://tunelko-gridfinity-bambulab-3d.mintlify.app/introduction) |
+🌐 **Live Demo:** [gridfinity.securedev.codes](https://gridfinity.securedev.codes/)
+
+📖 **Documentation:** [tunelko-gridfinity-bambulab-3d.mintlify.app](https://tunelko-gridfinity-bambulab-3d.mintlify.app/introduction)
 
 ![Gridfinity Builder](.github/images/gridbins.png)
 
