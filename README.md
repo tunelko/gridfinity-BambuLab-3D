@@ -7,6 +7,7 @@ Built for makers, 3D printing enthusiasts, and anyone who wants to organize thei
 > Gridfinity is an open-source modular storage system created by [Zack Freedman](https://www.youtube.com/@ZackFreedman). This tool helps you design custom bin layouts and export them as 3MF files ready for slicing.
 
 **Live Demo:** [https://gridfinity.securedev.codes/](https://gridfinity.securedev.codes/)
+**Documentation:** [https://tunelko-gridfinity-bambulab-3d.mintlify.app/introduction](https://tunelko-gridfinity-bambulab-3d.mintlify.app/introduction)
 
 ![Gridfinity Builder](.github/images/gridbins.png)
 
@@ -140,11 +141,15 @@ Install Gridfinity Builder on your device for offline use.
 | Key | Action |
 |-----|--------|
 | `R` | Rotate selected bin (swap W and D) |
-| `Delete` / `Backspace` | Remove selected bin |
+| `Delete` / `Backspace` | Remove selected bin(s) |
 | `Escape` | Cancel placing / dragging / resizing |
+| `Ctrl+C` | Copy selected bin(s) |
+| `Ctrl+V` | Paste (auto-place in first free position) |
+| `Ctrl+D` | Duplicate selected bin(s) |
+| `Ctrl+A` | Select all bins |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Shift+Z` | Redo |
-| `Shift + Left Click` | Pan the grid |
+| `Shift + Left Click` | Multi-select (toggle bin in/out of selection) |
 | `Middle Mouse` | Pan the grid |
 | `Scroll Wheel` | Zoom (0.2x to 5x) |
 
