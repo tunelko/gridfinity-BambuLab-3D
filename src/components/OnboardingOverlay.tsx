@@ -10,6 +10,11 @@ interface Step {
 
 const STEPS: Step[] = [
   {
+    title: 'Toolbar: Views & Export',
+    description: 'Switch between 2D, Split, and 3D views. Choose render modes (Solid, X-Ray, Blueprint), camera presets (Iso, Front, Top), toggle dimensions and section view. Export your layout as .3mf files ready for Bambu Studio, PrusaSlicer, or Cura.',
+    selector: '[data-onboarding="toolbar"]',
+  },
+  {
     title: 'Choose Your Baseplate',
     description: 'Select a printer preset (Bambu Lab A1, P1S, etc.) or set custom grid dimensions to match your build plate.',
     selector: '[data-onboarding="baseplate"]',
@@ -23,11 +28,6 @@ const STEPS: Step[] = [
     title: 'Configure Bins',
     description: 'Select a placed bin to configure dimensions, dividers, magnets, label shelf, and more. Use Shift+Click to multi-select.',
     selector: '[data-onboarding="bins"]',
-  },
-  {
-    title: 'Toolbar: Views & Export',
-    description: 'Switch between 2D, Split, and 3D views. Choose render modes (Solid, X-Ray, Blueprint), camera presets (Iso, Front, Top), toggle dimensions and section view. Export your layout as .3mf files ready for Bambu Studio, PrusaSlicer, or Cura.',
-    selector: '[data-onboarding="toolbar"]',
   },
 ];
 
