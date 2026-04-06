@@ -160,7 +160,7 @@ const TBtn = memo(function TBtn({
 
 // ── Segmented button group ──
 function SegGroup<T extends string>({ items, value, onChange, ariaLabel }: {
-  items: { value: T; label: string }[];
+  items: { value: T; label: string; icon?: React.ReactNode }[];
   value: T;
   onChange: (v: T) => void;
   ariaLabel: string;
@@ -175,14 +175,14 @@ function SegGroup<T extends string>({ items, value, onChange, ariaLabel }: {
         <button
           key={item.value}
           onClick={() => onChange(item.value)}
-          className="rounded-md font-medium transition-all"
+          className="rounded-md font-medium transition-all flex items-center"
           style={{
-            padding: '8px 14px', fontSize: 13,
+            padding: '8px 14px', fontSize: 13, gap: 6,
             background: value === item.value ? 'var(--accent)' : 'transparent',
             color: value === item.value ? 'var(--bg-primary)' : 'var(--text-secondary)',
           }}
           role="radio" aria-checked={value === item.value}
-        >{item.label}</button>
+        >{item.icon}{item.label}</button>
       ))}
     </div>
   );
@@ -330,9 +330,9 @@ export default function Toolbar() {
         <div className="hidden lg:block">
           <SegGroup
             items={[
-              { value: 'standard' as RenderMode, label: 'Solid' },
-              { value: 'technical' as RenderMode, label: 'X-Ray' },
-              { value: 'blueprint' as RenderMode, label: 'Blueprint' },
+              { value: 'standard' as RenderMode, label: 'Solid', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> },
+              { value: 'technical' as RenderMode, label: 'X-Ray', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" opacity="0.5"/><line x1="12" y1="2" x2="12" y2="22" opacity="0.3"/><line x1="2" y1="12" x2="22" y2="12" opacity="0.3"/></svg> },
+              { value: 'blueprint' as RenderMode, label: 'Blueprint', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> },
             ]}
             value={renderMode}
             onChange={setRenderMode}
@@ -342,17 +342,18 @@ export default function Toolbar() {
 
         {/* Camera presets (hide on small screens) */}
         <div className="hidden xl:flex items-center" style={{ gap: 4 }} role="group" aria-label="Camera presets">
-          {['Iso', 'Front', 'Top'].map((preset) => (
-            <button
-              key={preset} onClick={() => emitCameraPreset(preset.toLowerCase())}
-              className="rounded-md font-medium transition-all hover:brightness-125"
-              style={{
-                padding: '8px 14px', fontSize: 13,
-                background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)',
-              }}
-              aria-label={`${preset} camera view`}
-            >{preset}</button>
-          ))}
+          <button onClick={() => emitCameraPreset('iso')} className="rounded-md font-medium transition-all hover:brightness-125 flex items-center" style={{ padding: '8px 12px', fontSize: 12, gap: 5, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }} aria-label="Isometric camera view">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M12 2l10 6v8l-10 6L2 16V8z"/><path d="M12 8l10-6"/><path d="M12 8L2 2"/><path d="M12 8v14"/></svg>
+            Iso
+          </button>
+          <button onClick={() => emitCameraPreset('front')} className="rounded-md font-medium transition-all hover:brightness-125 flex items-center" style={{ padding: '8px 12px', fontSize: 12, gap: 5, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }} aria-label="Front camera view">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="12" x2="21" y2="12" opacity="0.3"/></svg>
+            Front
+          </button>
+          <button onClick={() => emitCameraPreset('top')} className="rounded-md font-medium transition-all hover:brightness-125 flex items-center" style={{ padding: '8px 12px', fontSize: 12, gap: 5, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }} aria-label="Top camera view">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><line x1="12" y1="3" x2="12" y2="5" opacity="0.4"/><line x1="12" y1="19" x2="12" y2="21" opacity="0.4"/><line x1="3" y1="12" x2="5" y2="12" opacity="0.4"/><line x1="19" y1="12" x2="21" y2="12" opacity="0.4"/></svg>
+            Top
+          </button>
         </div>
 
         <div className="shrink-0 hidden lg:block" style={{ width: 1, height: 24, background: 'var(--border)' }} />
@@ -373,12 +374,18 @@ export default function Toolbar() {
 
           {selectedBinId && (
             <TBtn onClick={() => handleExport('selected')} disabled={exporting} variant="accent" ariaLabel="Export selected bin">
-              {exporting ? exportProgress || 'Exporting...' : 'Export Bin'}
+              <span className="flex items-center" style={{ gap: 5 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                {exporting ? exportProgress || '...' : 'Bin'}
+              </span>
             </TBtn>
           )}
 
           <TBtn onClick={() => handleExport('all')} disabled={exporting || bins.length === 0} variant="accent" ariaLabel="Export all bins">
-            {exporting ? exportProgress || 'Exporting...' : 'Export All'}
+            <span className="flex items-center" style={{ gap: 5 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              {exporting ? exportProgress || '...' : 'All'}
+            </span>
           </TBtn>
 
           <TBtn onClick={() => setShowClearModal(true)} disabled={bins.length === 0} variant="danger" ariaLabel="Clear all bins">
