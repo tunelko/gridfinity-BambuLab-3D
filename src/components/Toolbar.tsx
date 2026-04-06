@@ -279,24 +279,38 @@ export default function Toolbar() {
     setToast(`Cleared ${count} ${count === 1 ? 'bin' : 'bins'}`);
   }
 
+  const sidebarOpen = useStore((s) => s.sidebarOpen);
+  const toggleSidebar = useStore((s) => s.toggleSidebar);
+
   return (
     <>
       <div
         className="flex items-center shrink-0"
         style={{ padding: '0 16px', height: 48, gap: 12, background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}
         role="toolbar" aria-label="Main toolbar"
+        data-onboarding="toolbar"
       >
+        {/* Hamburger (sidebar toggle) */}
+        <button
+          onClick={toggleSidebar}
+          className="shrink-0 hover:brightness-125 transition-all"
+          style={{ fontSize: 18, color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
+          aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+        >
+          {sidebarOpen ? '✕' : '☰'}
+        </button>
+
         {/* Logo */}
         <button
           onClick={() => setShowAbout(true)}
-          className="font-bold tracking-wide shrink-0 hover:brightness-125 transition-all"
+          className="font-bold tracking-wide shrink-0 hover:brightness-125 transition-all hidden sm:block"
           style={{ fontSize: 14, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}
           aria-label="About Gridfinity Builder"
         >
           GRIDFINITY
         </button>
 
-        <div className="shrink-0" style={{ width: 1, height: 24, background: 'var(--border)' }} />
+        <div className="shrink-0 hidden sm:block" style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
         {/* View mode */}
         <SegGroup
@@ -312,20 +326,22 @@ export default function Toolbar() {
 
         <div className="flex-1" />
 
-        {/* Render mode */}
-        <SegGroup
-          items={[
-            { value: 'standard' as RenderMode, label: 'Solid' },
-            { value: 'technical' as RenderMode, label: 'X-Ray' },
-            { value: 'blueprint' as RenderMode, label: 'Blueprint' },
-          ]}
-          value={renderMode}
-          onChange={setRenderMode}
-          ariaLabel="Render mode"
-        />
+        {/* Render mode (hide on small screens) */}
+        <div className="hidden lg:block">
+          <SegGroup
+            items={[
+              { value: 'standard' as RenderMode, label: 'Solid' },
+              { value: 'technical' as RenderMode, label: 'X-Ray' },
+              { value: 'blueprint' as RenderMode, label: 'Blueprint' },
+            ]}
+            value={renderMode}
+            onChange={setRenderMode}
+            ariaLabel="Render mode"
+          />
+        </div>
 
-        {/* Camera presets */}
-        <div className="flex items-center" style={{ gap: 4 }} role="group" aria-label="Camera presets">
+        {/* Camera presets (hide on small screens) */}
+        <div className="hidden xl:flex items-center" style={{ gap: 4 }} role="group" aria-label="Camera presets">
           {['Iso', 'Front', 'Top'].map((preset) => (
             <button
               key={preset} onClick={() => emitCameraPreset(preset.toLowerCase())}
@@ -339,15 +355,20 @@ export default function Toolbar() {
           ))}
         </div>
 
-        <div className="shrink-0" style={{ width: 1, height: 24, background: 'var(--border)' }} />
+        <div className="shrink-0 hidden lg:block" style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
         {/* Actions */}
-        <div className="flex items-center" style={{ gap: 6 }} role="group" aria-label="Actions">
+        <div className="flex items-center" style={{ gap: 6 }} role="group" aria-label="Actions" data-onboarding="export">
           <TBtn onClick={() => setShowDimensions(!showDimensions)} active={showDimensions} ariaLabel="Toggle dimension labels">
-            Dims
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 4h20v4H2z" /><path d="M4 8v2" /><path d="M8 8v4" /><path d="M12 8v2" /><path d="M16 8v4" /><path d="M20 8v2" />
+              <path d="M2 8v12h20V8" />
+            </svg>
           </TBtn>
           <TBtn onClick={() => setSectionView(!sectionView)} active={sectionView} variant="danger" ariaLabel="Toggle section view">
-            Section
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2" width="20" height="20" rx="2" /><line x1="12" y1="2" x2="12" y2="22" /><line x1="8" y1="6" x2="8" y2="6.01" /><line x1="8" y1="10" x2="8" y2="10.01" /><line x1="8" y1="14" x2="8" y2="14.01" /><line x1="8" y1="18" x2="8" y2="18.01" />
+            </svg>
           </TBtn>
 
           {selectedBinId && (
@@ -361,7 +382,7 @@ export default function Toolbar() {
           </TBtn>
 
           <TBtn onClick={() => setShowClearModal(true)} disabled={bins.length === 0} variant="danger" ariaLabel="Clear all bins">
-            Clear All
+            🗑️
           </TBtn>
         </div>
 
