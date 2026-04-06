@@ -140,10 +140,9 @@ export default function OnboardingOverlay() {
         />
       </svg>
 
-      {/* Highlight border around target */}
+      {/* Highlight border around target — yellow glow */}
       {targetRect && (
         <div
-          className="animate-glow-pulse"
           style={{
             position: 'fixed',
             left: targetRect.left - pad,
@@ -151,21 +150,27 @@ export default function OnboardingOverlay() {
             width: targetRect.width + pad * 2,
             height: targetRect.height + pad * 2,
             borderRadius: 8,
-            border: '2px solid var(--accent)',
+            border: '2px solid #ffc832',
+            boxShadow: '0 0 16px rgba(255, 200, 50, 0.5), 0 0 32px rgba(255, 200, 50, 0.2), inset 0 0 16px rgba(255, 200, 50, 0.05)',
             pointerEvents: 'none',
             zIndex: 10001,
+            animation: 'onboarding-glow 2s ease-in-out infinite',
           }}
         />
       )}
 
       {/* Tooltip */}
-      <div style={tooltipStyle}>
+      <div style={{
+        ...tooltipStyle,
+        border: '1px solid rgba(255, 200, 50, 0.3)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(255, 200, 50, 0.1)',
+      }}>
         {/* Step counter */}
-        <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: 8, fontFamily: 'JetBrains Mono, monospace' }}>
+        <div style={{ fontSize: 10, color: '#ffc832', marginBottom: 8, fontFamily: 'JetBrains Mono, monospace' }}>
           STEP {step + 1} OF {STEPS.length}
         </div>
 
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: '#ffc832', marginBottom: 8 }}>
           {current.title}
         </h3>
 
@@ -203,7 +208,7 @@ export default function OnboardingOverlay() {
               className="rounded font-medium transition-colors hover:brightness-125"
               style={{
                 padding: '8px 20px', fontSize: 12,
-                background: 'var(--accent)', color: 'var(--bg-primary)',
+                background: '#ffc832', color: '#000',
               }}
             >
               {step === STEPS.length - 1 ? 'Get Started' : 'Next'}
@@ -218,7 +223,7 @@ export default function OnboardingOverlay() {
               key={i}
               style={{
                 width: 6, height: 6, borderRadius: '50%',
-                background: i === step ? 'var(--accent)' : 'var(--border)',
+                background: i === step ? '#ffc832' : 'var(--border)',
                 transition: 'background 0.2s',
               }}
             />

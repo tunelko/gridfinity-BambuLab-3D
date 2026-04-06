@@ -1549,6 +1549,18 @@ export default function Sidebar() {
             Check for Updates
           </button>
         )}
+        <button
+          onClick={() => { resetOnboarding(); window.location.reload(); }}
+          className="w-full rounded font-medium transition-colors hover:brightness-125"
+          style={{
+            height: 30, fontSize: 12, marginBottom: 10,
+            background: 'rgba(255, 200, 50, 0.1)',
+            color: '#ffc832',
+            border: '1px solid rgba(255, 200, 50, 0.3)',
+          }}
+        >
+          Restart Tutorial
+        </button>
         <p style={{ fontSize: 10, lineHeight: 1.6, color: 'var(--text-secondary)' }}>
           Gridfinity is MIT licensed by{' '}
           <a href="https://www.youtube.com/@ZackFreedman" target="_blank" rel="noopener" style={{ color: 'var(--accent)' }}>Zack Freedman</a>
@@ -1558,13 +1570,6 @@ export default function Sidebar() {
         <p style={{ fontSize: 10, marginTop: 4, color: 'var(--border)' }}>
           v1.0.0 &middot; Manifold &middot; Three.js &middot; React
         </p>
-        <button
-          onClick={() => { resetOnboarding(); window.location.reload(); }}
-          className="transition-colors hover:brightness-125"
-          style={{ fontSize: 10, marginTop: 6, color: 'var(--text-secondary)', opacity: 0.5, background: 'none', border: 'none', cursor: 'pointer' }}
-        >
-          Restart Tutorial
-        </button>
       </div>
     </nav>
   );
