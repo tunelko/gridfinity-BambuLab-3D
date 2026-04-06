@@ -6,6 +6,11 @@ export default defineConfig({
   head: [
     ['link', { rel: 'icon', href: '/favicon.svg' }],
   ],
+  vite: {
+    server: {
+      allowedHosts: ['gridfinity-docs.securedev.codes'],
+    },
+  },
 
   themeConfig: {
     logo: '/favicon.svg',
