@@ -6,7 +6,7 @@ hero:
   text: Parametric CAD for 3D-printable storage
   tagline: Design, preview, and export Gridfinity bin layouts — entirely in your browser.
   image:
-    src: /images/gridbins.png
+    src: /images/gridlogo_munids.png
     alt: Gridfinity Builder
   actions:
     - theme: brand
