@@ -288,6 +288,7 @@ export default function Toolbar() {
         className="flex items-center shrink-0"
         style={{ padding: '0 16px', height: 48, gap: 12, background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}
         role="toolbar" aria-label="Main toolbar"
+        data-onboarding="toolbar"
       >
         {/* Hamburger (sidebar toggle) */}
         <button
