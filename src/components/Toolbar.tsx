@@ -360,10 +360,10 @@ export default function Toolbar() {
         {/* Actions */}
         <div className="flex items-center" style={{ gap: 6 }} role="group" aria-label="Actions" data-onboarding="export">
           <TBtn onClick={() => setShowDimensions(!showDimensions)} active={showDimensions} ariaLabel="Toggle dimension labels">
-            Dims
+            📏
           </TBtn>
           <TBtn onClick={() => setSectionView(!sectionView)} active={sectionView} variant="danger" ariaLabel="Toggle section view">
-            Section
+            🔪
           </TBtn>
 
           {selectedBinId && (
@@ -377,7 +377,7 @@ export default function Toolbar() {
           </TBtn>
 
           <TBtn onClick={() => setShowClearModal(true)} disabled={bins.length === 0} variant="danger" ariaLabel="Clear all bins">
-            Clear All
+            🗑️
           </TBtn>
         </div>
 
