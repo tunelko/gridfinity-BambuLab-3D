@@ -48,16 +48,15 @@ export default function App() {
     };
   }, []);
 
-  // Auto-close sidebar on narrow screens
+  // Auto-close sidebar when resizing to narrow screen
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');
-    function onChange(e: MediaQueryListEvent | MediaQueryList) {
-      if (e.matches && sidebarOpen) toggleSidebar();
+    function onChange(e: MediaQueryListEvent) {
+      if (e.matches) useStore.getState().toggleSidebar();
     }
-    onChange(mq);
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex flex-col h-full w-full" style={{ background: 'var(--bg-primary)' }}>
@@ -73,16 +72,14 @@ export default function App() {
         )}
 
         {/* Sidebar */}
-        <div
-          className={`
-            flex flex-col w-80 shrink-0 h-full z-30
-            fixed md:relative
-            transition-transform duration-200 ease-out
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:-translate-x-full'}
-          `}
-        >
-          <Sidebar />
-        </div>
+        {sidebarOpen && (
+          <div
+            className="flex flex-col w-80 shrink-0 h-full z-30 fixed md:relative"
+            style={{ background: 'var(--bg-secondary)' }}
+          >
+            <Sidebar />
+          </div>
+        )}
 
         {/* Canvas area */}
         <div ref={containerRef} className="flex flex-1 overflow-hidden relative">
