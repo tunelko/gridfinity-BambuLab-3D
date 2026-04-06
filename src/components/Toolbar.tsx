@@ -279,6 +279,9 @@ export default function Toolbar() {
     setToast(`Cleared ${count} ${count === 1 ? 'bin' : 'bins'}`);
   }
 
+  const sidebarOpen = useStore((s) => s.sidebarOpen);
+  const toggleSidebar = useStore((s) => s.toggleSidebar);
+
   return (
     <>
       <div
@@ -286,17 +289,27 @@ export default function Toolbar() {
         style={{ padding: '0 16px', height: 48, gap: 12, background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}
         role="toolbar" aria-label="Main toolbar"
       >
+        {/* Hamburger (sidebar toggle) */}
+        <button
+          onClick={toggleSidebar}
+          className="shrink-0 hover:brightness-125 transition-all"
+          style={{ fontSize: 18, color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
+          aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+        >
+          {sidebarOpen ? '✕' : '☰'}
+        </button>
+
         {/* Logo */}
         <button
           onClick={() => setShowAbout(true)}
-          className="font-bold tracking-wide shrink-0 hover:brightness-125 transition-all"
+          className="font-bold tracking-wide shrink-0 hover:brightness-125 transition-all hidden sm:block"
           style={{ fontSize: 14, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}
           aria-label="About Gridfinity Builder"
         >
           GRIDFINITY
         </button>
 
-        <div className="shrink-0" style={{ width: 1, height: 24, background: 'var(--border)' }} />
+        <div className="shrink-0 hidden sm:block" style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
         {/* View mode */}
         <SegGroup
@@ -312,20 +325,22 @@ export default function Toolbar() {
 
         <div className="flex-1" />
 
-        {/* Render mode */}
-        <SegGroup
-          items={[
-            { value: 'standard' as RenderMode, label: 'Solid' },
-            { value: 'technical' as RenderMode, label: 'X-Ray' },
-            { value: 'blueprint' as RenderMode, label: 'Blueprint' },
-          ]}
-          value={renderMode}
-          onChange={setRenderMode}
-          ariaLabel="Render mode"
-        />
+        {/* Render mode (hide on small screens) */}
+        <div className="hidden lg:block">
+          <SegGroup
+            items={[
+              { value: 'standard' as RenderMode, label: 'Solid' },
+              { value: 'technical' as RenderMode, label: 'X-Ray' },
+              { value: 'blueprint' as RenderMode, label: 'Blueprint' },
+            ]}
+            value={renderMode}
+            onChange={setRenderMode}
+            ariaLabel="Render mode"
+          />
+        </div>
 
-        {/* Camera presets */}
-        <div className="flex items-center" style={{ gap: 4 }} role="group" aria-label="Camera presets">
+        {/* Camera presets (hide on small screens) */}
+        <div className="hidden xl:flex items-center" style={{ gap: 4 }} role="group" aria-label="Camera presets">
           {['Iso', 'Front', 'Top'].map((preset) => (
             <button
               key={preset} onClick={() => emitCameraPreset(preset.toLowerCase())}
@@ -339,10 +354,10 @@ export default function Toolbar() {
           ))}
         </div>
 
-        <div className="shrink-0" style={{ width: 1, height: 24, background: 'var(--border)' }} />
+        <div className="shrink-0 hidden lg:block" style={{ width: 1, height: 24, background: 'var(--border)' }} />
 
         {/* Actions */}
-        <div className="flex items-center" style={{ gap: 6 }} role="group" aria-label="Actions">
+        <div className="flex items-center" style={{ gap: 6 }} role="group" aria-label="Actions" data-onboarding="export">
           <TBtn onClick={() => setShowDimensions(!showDimensions)} active={showDimensions} ariaLabel="Toggle dimension labels">
             Dims
           </TBtn>
