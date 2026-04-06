@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0a0a0f"/>
+  <rect x="48" y="48" width="416" height="416" rx="64" fill="none" stroke="#00d4aa" stroke-width="16" opacity="0.3"/>
+  <!-- Grid lines -->
+  <line x1="186" y1="80" x2="186" y2="432" stroke="#00d4aa" stroke-width="4" opacity="0.2"/>
+  <line x1="326" y1="80" x2="326" y2="432" stroke="#00d4aa" stroke-width="4" opacity="0.2"/>
+  <line x1="80" y1="186" x2="432" y2="186" stroke="#00d4aa" stroke-width="4" opacity="0.2"/>
+  <line x1="80" y1="326" x2="432" y2="326" stroke="#00d4aa" stroke-width="4" opacity="0.2"/>
+  <!-- GF text -->
+  <text x="256" y="296" text-anchor="middle" font-family="monospace" font-weight="700" font-size="180" fill="#00d4aa">GF</text>
+</svg>

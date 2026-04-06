@@ -17,3 +17,15 @@ services:
     environment:
       - NODE_ENV=development
     restart: unless-stopped
+
+  docs:
+    build:
+      context: ./docs
+      dockerfile: Dockerfile
+      no_cache: true
+    ports:
+      - "4173:4173"
+    volumes:
+      - ./docs:/docs
+      - /docs/node_modules
+    restart: unless-stopped

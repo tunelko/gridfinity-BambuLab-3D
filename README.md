@@ -8,7 +8,7 @@ Built for makers, 3D printing enthusiasts, and anyone who wants to organize thei
 
 🌐 **Live Demo:** [gridfinity.securedev.codes](https://gridfinity.securedev.codes/)
 
-📖 **Documentation:** [tunelko-gridfinity-bambulab-3d.mintlify.app](https://tunelko-gridfinity-bambulab-3d.mintlify.app/introduction)
+📖 **Documentation:** [gridfinity-docs.securedev.codes](https://gridfinity-docs.securedev.codes/)
 
 ![Gridfinity Builder](.github/images/gridbins.png)
 
