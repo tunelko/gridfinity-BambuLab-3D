@@ -360,10 +360,15 @@ export default function Toolbar() {
         {/* Actions */}
         <div className="flex items-center" style={{ gap: 6 }} role="group" aria-label="Actions" data-onboarding="export">
           <TBtn onClick={() => setShowDimensions(!showDimensions)} active={showDimensions} ariaLabel="Toggle dimension labels">
-            📏
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 4h20v4H2z" /><path d="M4 8v2" /><path d="M8 8v4" /><path d="M12 8v2" /><path d="M16 8v4" /><path d="M20 8v2" />
+              <path d="M2 8v12h20V8" />
+            </svg>
           </TBtn>
           <TBtn onClick={() => setSectionView(!sectionView)} active={sectionView} variant="danger" ariaLabel="Toggle section view">
-            🔪
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2" width="20" height="20" rx="2" /><line x1="12" y1="2" x2="12" y2="22" /><line x1="8" y1="6" x2="8" y2="6.01" /><line x1="8" y1="10" x2="8" y2="10.01" /><line x1="8" y1="14" x2="8" y2="14.01" /><line x1="8" y1="18" x2="8" y2="18.01" />
+            </svg>
           </TBtn>
 
           {selectedBinId && (
