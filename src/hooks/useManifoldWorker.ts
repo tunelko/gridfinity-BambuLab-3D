@@ -1,4 +1,3 @@
-import { useEffect, useRef, useCallback } from 'react';
 import type { BinConfig } from '../gridfinity/binGeometry';
 
 type MeshResult = { positions: Float32Array; indices: Uint32Array };

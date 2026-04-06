@@ -31,12 +31,12 @@ export default defineConfig({
         clientsClaim: true,
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com/,
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/,
             handler: 'CacheFirst',
             options: { cacheName: 'google-fonts-stylesheets' },
           },
           {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com/,
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'google-fonts-webfonts',
