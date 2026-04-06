@@ -3,10 +3,14 @@ import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
 import GridCanvas2D from './components/GridCanvas2D';
 import Viewport3D from './components/Viewport3D';
+import HistoryTimeline from './components/HistoryTimeline';
+import OnboardingOverlay from './components/OnboardingOverlay';
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 export default function App() {
   const viewMode = useStore((s) => s.viewMode);
+  const sidebarOpen = useStore((s) => s.sidebarOpen);
+  const toggleSidebar = useStore((s) => s.toggleSidebar);
 
   const [splitPercent, setSplitPercent] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,11 +48,40 @@ export default function App() {
     };
   }, []);
 
+  // Auto-close sidebar when resizing to narrow screen
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    function onChange(e: MediaQueryListEvent) {
+      if (e.matches) useStore.getState().toggleSidebar();
+    }
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
   return (
     <div className="flex flex-col h-full w-full" style={{ background: 'var(--bg-primary)' }}>
       <Toolbar />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile backdrop */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-20 md:hidden"
+            style={{ background: 'rgba(0,0,0,0.5)' }}
+            onClick={toggleSidebar}
+          />
+        )}
+
+        {/* Sidebar */}
+        {sidebarOpen && (
+          <div
+            className="flex flex-col w-80 shrink-0 h-full z-30 fixed md:relative"
+            style={{ background: 'var(--bg-secondary)' }}
+          >
+            <Sidebar />
+          </div>
+        )}
+
+        {/* Canvas area */}
         <div ref={containerRef} className="flex flex-1 overflow-hidden relative">
           {(viewMode === '2d' || viewMode === 'split') && (
             <div
@@ -63,7 +96,7 @@ export default function App() {
           {viewMode === 'split' && (
             <div
               onMouseDown={handleMouseDown}
-              className="shrink-0 z-10 group"
+              className="shrink-0 z-10 group hidden md:block"
               style={{
                 width: '6px',
                 cursor: 'col-resize',
@@ -79,8 +112,12 @@ export default function App() {
               <Viewport3D />
             </div>
           )}
+
+          <HistoryTimeline />
         </div>
       </div>
+
+      <OnboardingOverlay />
     </div>
   );
 }

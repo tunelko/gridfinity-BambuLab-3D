@@ -3,6 +3,7 @@ import { useStore, type Bin } from '../store/useStore';
 import { GF, GRID_PRESETS, BIN_PRESETS, BIN_GROUPS, LAYOUT_TEMPLATES, type LayoutTemplate } from '../gridfinity/constants';
 import { checkCollision } from '../utils/collision';
 import BinConfigurator from './BinConfigurator';
+import { resetOnboarding } from './OnboardingOverlay';
 
 // ── PWA force update ──
 
@@ -392,6 +393,36 @@ export default function Sidebar() {
     win.document.close();
   }
 
+  // ── BOM CSV Export ──
+
+  function handleExportBOMCSV() {
+    if (bom.length === 0) return;
+    const headers = ['Type','Width (u)','Depth (u)','Height (u)','Count','Volume/unit (cm3)','Total volume (cm3)','Weight PLA (g)','Cost (EUR)'];
+    const rows = bom.map((g) => {
+      const totalVol = g.volumeCm3 * g.count;
+      const weight = totalVol * 1.24;
+      const cost = (weight / 1000) * plaEurKg;
+      return [
+        `"${g.label.replace(/"/g, '""')}"`,
+        g.w, g.d, g.h, g.count,
+        g.volumeCm3.toFixed(2), totalVol.toFixed(2),
+        weight.toFixed(1), cost.toFixed(2),
+      ].join(',');
+    });
+    const totalWeight = totalVolume * 1.24;
+    rows.push('');
+    rows.push(`"TOTAL",,,,${bins.length},,${totalVolume.toFixed(2)},${totalWeight.toFixed(1)},${((totalWeight / 1000) * plaEurKg).toFixed(2)}`);
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gridfinity-bom-${gridCols}x${gridRows}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('BOM exported as CSV');
+  }
+
   // ── JSON Export/Import ──
 
   function handleExportJSON() {
@@ -633,7 +664,7 @@ export default function Sidebar() {
 
   return (
     <nav
-      className="flex flex-col w-80 shrink-0 overflow-y-auto relative"
+      className="flex flex-col w-full h-full overflow-y-auto relative"
       style={{ background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)' }}
       aria-label="Sidebar controls"
     >
@@ -801,7 +832,7 @@ export default function Sidebar() {
       )}
 
       {/* Printer / Baseplate */}
-      <Section title="PRINTER / BASEPLATE">
+      <Section title="PRINTER / BASEPLATE" data-onboarding="baseplate">
         <div className="flex flex-wrap" style={{ gap: 6, marginBottom: 12 }}>
           {GRID_PRESETS.map((p) => {
             const active = gridCols === p.cols && gridRows === p.rows;
@@ -851,7 +882,7 @@ export default function Sidebar() {
       </Section>
 
       {/* Add Bin */}
-      <Section title="ADD BIN">
+      <Section title="ADD BIN" data-onboarding="add-bin">
         {dragState.mode === 'placing' ? (
           <div className="text-center" style={{ padding: '12px 0', color: 'var(--accent)' }}>
             <div style={{ marginBottom: 10, fontSize: 11 }}>Click on grid to place bin...</div>
@@ -917,7 +948,7 @@ export default function Sidebar() {
       </Section>
 
       {/* Bin List */}
-      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      <div data-onboarding="bins" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <button
           onClick={() => setBinsCollapsed(!binsCollapsed)}
           className="w-full flex items-center justify-between transition-colors"
@@ -1461,6 +1492,16 @@ export default function Sidebar() {
               </span>
             </div>
           </div>
+          <button
+            onClick={handleExportBOMCSV}
+            className="w-full rounded font-medium transition-colors hover:brightness-125"
+            style={{
+              height: 30, fontSize: 11, marginTop: 10,
+              background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)',
+            }}
+          >
+            Export BOM as CSV
+          </button>
         </Section>
       )}
 
@@ -1508,6 +1549,18 @@ export default function Sidebar() {
             Check for Updates
           </button>
         )}
+        <button
+          onClick={() => { resetOnboarding(); window.location.reload(); }}
+          className="w-full rounded font-medium transition-colors hover:brightness-125"
+          style={{
+            height: 30, fontSize: 12, marginBottom: 10,
+            background: 'rgba(255, 200, 50, 0.1)',
+            color: '#ffc832',
+            border: '1px solid rgba(255, 200, 50, 0.3)',
+          }}
+        >
+          Restart Tutorial
+        </button>
         <p style={{ fontSize: 10, lineHeight: 1.6, color: 'var(--text-secondary)' }}>
           Gridfinity is MIT licensed by{' '}
           <a href="https://www.youtube.com/@ZackFreedman" target="_blank" rel="noopener" style={{ color: 'var(--accent)' }}>Zack Freedman</a>
@@ -1522,9 +1575,9 @@ export default function Sidebar() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, ...rest }: { title: string; children: React.ReactNode; 'data-onboarding'?: string }) {
   return (
-    <div style={{ padding: 16, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+    <div style={{ padding: 16, borderBottom: '1px solid rgba(255,255,255,0.08)' }} {...rest}>
       <h3
         className="font-bold uppercase"
         style={{ fontSize: 12, letterSpacing: '0.05em', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}
