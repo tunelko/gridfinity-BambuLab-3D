@@ -24,6 +24,7 @@ export default function GridCanvas2D() {
   const gridCols = useStore((s) => s.gridCols);
   const gridRows = useStore((s) => s.gridRows);
   const selectedBinIds = useStore((s) => s.selectedBinIds);
+  const clipboard = useStore((s) => s.clipboard);
   const selectBin = useStore((s) => s.selectBin);
   const addBin = useStore((s) => s.addBin);
   const removeBin = useStore((s) => s.removeBin);
@@ -31,6 +32,14 @@ export default function GridCanvas2D() {
   const updateBin = useStore((s) => s.updateBin);
   const dragState = useStore((s) => s.dragState);
   const cancelPlacing = useStore((s) => s.cancelPlacing);
+
+  const [gridToast, setGridToast] = useState<string | null>(null);
+  const gridToastRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function showGridToast(msg: string) {
+    if (gridToastRef.current) clearTimeout(gridToastRef.current);
+    setGridToast(msg);
+    gridToastRef.current = setTimeout(() => setGridToast(null), 2000);
+  }
 
   // Pan & zoom
   const [pan, setPan] = useState({ x: 40, y: 40 });
@@ -184,6 +193,37 @@ export default function GridCanvas2D() {
               useStore.getState().updateBin(bin.id, { w: bin.d, d: bin.w });
             }
           }
+        }
+        return;
+      }
+
+      // Ctrl+C: copy selected bins to clipboard
+      if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
+        if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+        e.preventDefault();
+        if (state.selectedBinIds.length > 0) {
+          useStore.getState().copySelected();
+        }
+        return;
+      }
+
+      // Ctrl+V: paste clipboard (auto-place)
+      if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
+        if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+        e.preventDefault();
+        const pasted = useStore.getState().pasteClipboard();
+        if (pasted === 0) showGridToast('No room to paste');
+        return;
+      }
+
+      // Ctrl+D: duplicate (copy + immediate paste)
+      if (e.key === 'd' && (e.ctrlKey || e.metaKey)) {
+        if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+        e.preventDefault();
+        if (state.selectedBinIds.length > 0) {
+          useStore.getState().copySelected();
+          const pasted = useStore.getState().pasteClipboard();
+          if (pasted === 0) showGridToast('No room to duplicate');
         }
         return;
       }
@@ -1360,13 +1400,33 @@ export default function GridCanvas2D() {
         {(zoom * 100).toFixed(0)}%
       </div>
 
+      {/* Grid toast (copy/paste feedback) */}
+      {gridToast && (
+        <div
+          className="absolute top-3 right-12 text-[10px] px-2 py-1 rounded animate-slide-up"
+          style={{ background: 'rgba(0,0,0,0.7)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)' }}
+        >
+          {gridToast}
+        </div>
+      )}
+
+      {/* Clipboard indicator */}
+      {clipboard && clipboard.length > 0 && (
+        <div
+          className="absolute bottom-10 right-3 text-[10px] px-2 py-1 rounded"
+          style={{ background: 'rgba(0,0,0,0.5)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+        >
+          📋 {clipboard.length} — Ctrl+V to paste
+        </div>
+      )}
+
       {/* Multi-selection indicator */}
       {selectedBinIds.length > 1 && (
         <div
           className="absolute top-3 left-3 text-[10px] px-2 py-1 rounded"
           style={{ background: 'rgba(0, 212, 170, 0.15)', color: 'var(--accent)', border: '1px solid rgba(0, 212, 170, 0.3)' }}
         >
-          {selectedBinIds.length} bins selected | Del to remove | Ctrl+A select all
+          {selectedBinIds.length} selected | C copy | D dup | Del remove
         </div>
       )}
 
