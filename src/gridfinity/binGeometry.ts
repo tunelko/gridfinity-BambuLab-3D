@@ -432,11 +432,15 @@ interface ZSection {
   rShrinkBot: number;
 }
 
+// Official Gridfinity base Z-profile per cell (cell = 41.5mm after tolerance).
+// Layer A: 0.00→0.80   vertical, width 37.10 (shrink 4.40 from 41.5)
+// Layer B: 0.80→2.40   45° chamfer, 37.10 → 38.70
+// Layer C: 2.40→4.65   vertical, width 38.70 (shrink 2.80)
+// Layer D handled separately as the top lip (z=4.65→4.75, full cell width 41.50)
 const Z_PROFILE_SECTIONS: ZSection[] = [
   { zStart: 0.00, height: 0.80, shrinkBot: 4.40, shrinkTop: 4.40, rShrinkBot: 2.20 },
-  { zStart: 0.80, height: 0.80, shrinkBot: 4.40, shrinkTop: 2.80, rShrinkBot: 2.20 },
-  { zStart: 1.60, height: 0.55, shrinkBot: 2.80, shrinkTop: 2.80, rShrinkBot: 1.40 },
-  { zStart: 2.15, height: 0.80, shrinkBot: 2.80, shrinkTop: 1.20, rShrinkBot: 1.40 },
+  { zStart: 0.80, height: 1.60, shrinkBot: 4.40, shrinkTop: 2.80, rShrinkBot: 2.20 },
+  { zStart: 2.40, height: 2.25, shrinkBot: 2.80, shrinkTop: 2.80, rShrinkBot: 1.40 },
 ];
 
 function createExportCellBase(wasm: ManifoldToplevel, cornerRadius: number): any {
@@ -467,12 +471,13 @@ function createExportCellBase(wasm: ManifoldToplevel, cornerRadius: number): any
     sections.push(translated);
   }
 
-  // Layer 5: full cell width, z=2.95→4.75
-  const slabH = GF.BASE_TOTAL_HEIGHT - 2.95;
-  const slab = roundedBox(wasm, cellSize, cellSize, slabH, cornerRadius);
-  const slabPos = slab.translate([0, 0, 2.95]);
-  slab.delete();
-  sections.push(slabPos);
+  // Top lip: full cell width, z=4.65→4.75 (0.10mm — joins cells in multi-bin)
+  const lipZStart = 4.65;
+  const lipH = GF.BASE_TOTAL_HEIGHT - lipZStart;
+  const lip = roundedBox(wasm, cellSize, cellSize, lipH, cornerRadius);
+  const lipPos = lip.translate([0, 0, lipZStart]);
+  lip.delete();
+  sections.push(lipPos);
 
   return unionAll(wasm, sections);
 }
@@ -506,10 +511,11 @@ export function generateBinExport(
   // 1. Per-cell 5-layer Z-profile bases
   const cellBases = createExportCellBases(wasm, config.w, config.d, r);
 
-  // 2. Full-width slab bridging inter-cell gaps (z=2.95→4.75)
-  const slabH = bodyStartZ - 2.95;
+  // 2. Top lip bridging inter-cell gaps (z=4.65→4.75, 0.10mm)
+  const lipZStart = 4.65;
+  const slabH = bodyStartZ - lipZStart;
   const slab = roundedBox(wasm, outerW, outerD, slabH, r);
-  const slabPos = slab.translate([0, 0, 2.95]);
+  const slabPos = slab.translate([0, 0, lipZStart]);
   slab.delete();
 
   const base = cellBases.add(slabPos);
