@@ -13,38 +13,44 @@ docker compose up -d
 
 The app will be available at `http://localhost:5173`.
 
-## Configuration
+## How it works
 
-The `docker-compose.yml` mounts source files as volumes for hot-reload during development:
+Both services use **multi-stage builds**: a `node:24-alpine` stage compiles the static
+site (`npm run build` / `vitepress build`), and an `nginx:alpine` stage serves the
+resulting files. The running containers contain **no Node runtime, no source code and
+no dev server** — only static assets behind nginx.
 
-```yaml
-volumes:
-  - ./src:/app/src
-  - ./public:/app/public
-  - ./index.html:/app/index.html
-  - ./vite.config.ts:/app/vite.config.ts
-  - ./tailwind.config.ts:/app/tailwind.config.ts
-```
+| Service | Host port | Serves |
+|---------|-----------|--------|
+| `app`   | 5173      | Vite production build (`dist/`) |
+| `docs`  | 4173      | VitePress build (`.vitepress/dist/`) |
+
+Deploying a change is always: rebuild image + restart container.
 
 ## Useful Commands
 
 | Command | Description |
 |---------|-------------|
-| `docker compose build --no-cache` | Rebuild the container (always use `--no-cache`) |
+| `docker compose build --no-cache` | Rebuild the images (always use `--no-cache`) |
 | `docker compose up -d` | Start in background |
 | `docker compose logs --tail 30` | View recent logs |
-| `docker compose down` | Stop the container |
+| `docker compose down` | Stop the containers |
 
 ::: tip
 Always use `--no-cache` when building to ensure all modified files are applied.
 :::
 
-## Production Deployment
+## Local development
 
-For production, build the static assets and serve with nginx or Cloudflare Pages:
+For hot-reload development, run Vite directly (outside Docker):
 
 ```bash
-docker compose exec app npm run build
+npm install
+npm run dev
 ```
 
-The `dist/` folder contains the complete static site.
+::: warning
+Do not expose `npm run dev` to the internet. The Vite dev server serves project
+files and is not hardened for public traffic — that is exactly what the nginx
+production images exist for.
+:::

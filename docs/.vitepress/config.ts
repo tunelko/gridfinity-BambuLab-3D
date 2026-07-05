@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
+  // localhost links are examples for local setup, not real targets
+  ignoreDeadLinks: [/^https?:\/\/localhost/],
   title: 'Gridfinity Builder',
   description: 'Browser-based parametric CAD tool for Gridfinity storage layouts',
   head: [
