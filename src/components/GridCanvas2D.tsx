@@ -1277,7 +1277,7 @@ export default function GridCanvas2D() {
           const bh = hoveredBin.d * cellSize;
           const wMM = (hoveredBin.w * GF.CELL_SIZE - GF.TOLERANCE).toFixed(1);
           const dMM = (hoveredBin.d * GF.CELL_SIZE - GF.TOLERANCE).toFixed(1);
-          const hMM = (hoveredBin.h * GF.HEIGHT_UNIT + GF.BASE_TOTAL_HEIGHT).toFixed(1);
+          const hMM = (hoveredBin.h * GF.HEIGHT_UNIT).toFixed(1);
 
           return (
             <g pointerEvents="none">
@@ -1334,7 +1334,7 @@ export default function GridCanvas2D() {
           const bh = bin.d * cellSize;
           const wMM = (bin.w * GF.CELL_SIZE - GF.TOLERANCE).toFixed(1);
           const dMM = (bin.d * GF.CELL_SIZE - GF.TOLERANCE).toFixed(1);
-          const hMM = (bin.h * GF.HEIGHT_UNIT + GF.BASE_TOTAL_HEIGHT).toFixed(1);
+          const hMM = (bin.h * GF.HEIGHT_UNIT).toFixed(1);
 
           return (
             <g pointerEvents="none">
