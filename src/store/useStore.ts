@@ -15,6 +15,8 @@ export interface Bin {
   labelShelf: boolean;
   labelWidth: number;
   magnets: boolean;
+  magnetDiameter?: number; // mm, default GF.MAGNET_DIAMETER (6)
+  magnetDepth?: number;    // mm, default GF.MAGNET_DEPTH (2)
   screws: boolean;
   dividersX: number;
   dividersY: number;

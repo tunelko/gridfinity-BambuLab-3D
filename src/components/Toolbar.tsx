@@ -235,6 +235,8 @@ export default function Toolbar() {
           cornerRadius: bin.cornerRadius, wallThickness: bin.wallThickness,
           bottomThickness: bin.bottomThickness,
           magnets: bin.magnets, screws: bin.screws,
+          magnetDiameter: bin.magnetDiameter, magnetDepth: bin.magnetDepth,
+          stackingLip: bin.stackingLip,
           labelShelf: bin.labelShelf, labelWidth: bin.labelWidth,
           dividersX: bin.dividersX, dividersY: bin.dividersY,
         };

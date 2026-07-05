@@ -24,7 +24,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - run: npm install --ignore-scripts
 
@@ -66,6 +66,9 @@ jobs:
         with:
           fail-on-severity: high
           deny-licenses: GPL-3.0, AGPL-3.0
+          # jszip is dual-licensed "GPL-3.0-only OR MIT" — we use it under MIT,
+          # but the GPL half trips the deny-list. Exempt the package explicitly.
+          allow-dependencies-licenses: pkg:npm/jszip
 
   # Secret scanning: catch committed API keys, tokens, PATs
   gitleaks:

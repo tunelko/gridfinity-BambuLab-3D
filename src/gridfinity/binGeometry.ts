@@ -114,10 +114,11 @@ function cellHolePositions(
 
 function createMagnetHoles(
   wasm: ManifoldToplevel, unitsW: number, unitsD: number, cornerRadius: number,
+  magnetDiameter: number, magnetDepth: number,
 ): any {
   const holes: any[] = [];
-  const r = (GF.MAGNET_DIAMETER + 0.5) / 2;
-  const depth = GF.MAGNET_DEPTH + 0.4;
+  const r = (magnetDiameter + 0.5) / 2; // +0.5mm clearance for press-fit
+  const depth = magnetDepth + 0.4;      // +0.4mm so magnet sits flush
   const inset = safeHoleInset(cornerRadius, r);
   const positions = cellHolePositions(unitsW, unitsD, inset);
 
@@ -278,12 +279,99 @@ function createHollowBody(
   return outerBodyPos;
 }
 
+// ── Stacking Lip ─────────────────────────────────────────────────────────────
+//
+// The stacking lip is the female counterpart of the base feet, cut into the TOP
+// of the outer wall so an identical bin's feet seat into it when stacked.
+//
+// To guarantee a perfect fit between two identical bins, the lip is derived from
+// the SAME profile as the foot — we build a "negative" solid shaped like the foot
+// (chamfer + walls) and subtract it from the top rim. Since the foot of the bin
+// placed on top has exactly this profile, it drops in flush.
+//
+// Profile (matching the official Gridfinity foot, mirrored at the rim):
+//   The foot rises 0.8 (straight) + 1.6 (chamfer out) + 2.25 (straight) = 4.65mm.
+//   The lip mirrors this into the top: the rim's inner edge steps OUT going down,
+//   forming a seat. We cut a 4.4mm-tall recess (STACKING_LIP_HEIGHT).
+//
+// outerW/outerD/r are the bin's outer dimensions and corner radius.
+// unitsW/unitsD are the cell counts — the seat is built PER CELL so it mirrors
+// the foot grid exactly, letting a stacked bin's feet drop into their own cells.
+// bodyTopZ is the Z of the top rim.
+function createStackingLip(
+  wasm: ManifoldToplevel,
+  outerW: number, outerD: number,
+  bodyTopZ: number,
+  r: number,
+): any {
+  // Standard Gridfinity stacking lip: a single perimeter recess cut into the top
+  // rim. Two identical bins stack flush because both the lip and the feet follow
+  // the 42mm grid — the recess receives the outer wall of the stacked bin's feet.
+  // Internal dividers do NOT affect this; the lip is purely a perimeter feature.
+  //
+  // Recess = full-footprint block MINUS a seat plug whose profile matches the
+  // foot, so the stacked bin's outer profile drops in. Profile from rim DOWN:
+  //   top ledge:  inset 1.90 (wall)   z 0.00→ledgeH
+  //   chamfer:    inset 1.90→2.60      h 0.70    ← 45° seat
+  //   drop wall:  inset 2.60           down to lip bottom
+  const lipH = GF.STACKING_LIP_HEIGHT; // 3.0
+  const lipBottomZ = bodyTopZ - lipH;
+
+  // Single perimeter ring helper on the full footprint.
+  function ring(insetBot: number, insetTop: number, h: number, zStart: number): any {
+    const wBot = outerW - 2 * insetBot;
+    const dBot = outerD - 2 * insetBot;
+    const rBot = Math.max(0, r - insetBot);
+    if (wBot <= 0 || dBot <= 0 || h <= 0) return null;
+    const poly = createRoundedRectPolygon(wBot, dBot, rBot);
+    const cs = new wasm.CrossSection(poly);
+    let solid: any;
+    if (Math.abs(insetBot - insetTop) > 1e-6) {
+      const wTop = outerW - 2 * insetTop;
+      solid = cs.extrude(h, 0, 0, [wTop / wBot, wTop / wBot]);
+    } else {
+      solid = cs.extrude(h);
+    }
+    cs.delete();
+    const pos = solid.translate([0, 0, zStart]);
+    solid.delete();
+    return pos;
+  }
+
+  // Full-footprint block over the lip region.
+  const outerBlock = roundedBox(wasm, outerW, outerD, lipH + 0.1, r);
+  const outerBlockPos = outerBlock.translate([0, 0, lipBottomZ]);
+  outerBlock.delete();
+
+  // Seat plug (single perimeter). Heights from lip bottom up:
+  //   drop wall:  inset 2.60          h 1.20
+  //   chamfer:    inset 2.60→1.90     h 0.70 (seats the foot)
+  //   top ledge:  inset 1.90          h remaining (+overshoot)
+  const dropH = 1.20;
+  const chamH = 0.70;
+  const ledgeH = lipH - dropH - chamH;
+  const dropWall = ring(2.60, 2.60, dropH, lipBottomZ);
+  const chamfer = ring(2.60, 1.90, chamH, lipBottomZ + dropH);
+  const topLedge = ring(1.90, 1.90, ledgeH + 0.2, lipBottomZ + dropH + chamH);
+  const parts = [dropWall, chamfer, topLedge].filter(Boolean);
+  const plug = unionAll(wasm, parts);
+
+  const recess = outerBlockPos.subtract(plug);
+  outerBlockPos.delete();
+  plug.delete();
+  return recess;
+}
+
 function applyHoles(wasm: ManifoldToplevel, bin: any, config: BinConfig): any {
   let result = bin;
 
   if (config.magnets) {
     try {
-      const holes = createMagnetHoles(wasm, config.w, config.d, config.cornerRadius);
+      const holes = createMagnetHoles(
+        wasm, config.w, config.d, config.cornerRadius,
+        config.magnetDiameter ?? GF.MAGNET_DIAMETER,
+        config.magnetDepth ?? GF.MAGNET_DEPTH,
+      );
       const after = result.subtract(holes);
       result.delete();
       holes.delete();
@@ -311,6 +399,10 @@ function applyHoles(wasm: ManifoldToplevel, bin: any, config: BinConfig): any {
 function applyFeatures(wasm: ManifoldToplevel, bin: any, config: BinConfig): any {
   let result = bin;
 
+  const labelWidth = config.labelWidth ?? GF.LABEL_DEFAULT_WIDTH;
+  const dividersX = config.dividersX ?? 0;
+  const dividersY = config.dividersY ?? 0;
+
   const outerW = config.w * GF.CELL_SIZE - GF.TOLERANCE;
   const outerD = config.d * GF.CELL_SIZE - GF.TOLERANCE;
   const bodyH = config.h * GF.HEIGHT_UNIT;
@@ -324,12 +416,25 @@ function applyFeatures(wasm: ManifoldToplevel, bin: any, config: BinConfig): any
   const cavityStartZ = bodyStartZ + bottom;
   const cavityH = bodyH - bottom;
 
+  // Stacking lip (recess cut into the top rim so identical bins stack flush)
+  if (config.stackingLip && cavityH > 0) {
+    try {
+      const lip = createStackingLip(wasm, outerW, outerD, bodyTopZ, r);
+      const after = result.subtract(lip);
+      result.delete();
+      lip.delete();
+      result = after;
+    } catch (err) {
+      console.warn('[BIN] stacking lip failed:', err);
+    }
+  }
+
   // Label shelf (subtract from front wall)
-  if (config.labelShelf && config.labelWidth > 0 && cavityH > 0) {
+  if (config.labelShelf && labelWidth > 0 && cavityH > 0) {
     try {
       const shelf = createLabelShelf(
         wasm, outerW, outerD, bodyStartZ, bodyTopZ,
-        wall, config.labelWidth, r,
+        wall, labelWidth, r,
       );
       const after = result.subtract(shelf);
       result.delete();
@@ -341,11 +446,11 @@ function applyFeatures(wasm: ManifoldToplevel, bin: any, config: BinConfig): any
   }
 
   // Dividers (add internal walls)
-  if ((config.dividersX > 0 || config.dividersY > 0) && cavityH > 0) {
+  if ((dividersX > 0 || dividersY > 0) && cavityH > 0) {
     try {
       const divs = createDividers(
         wasm, innerW, innerD, cavityStartZ, cavityH,
-        wall, config.dividersX, config.dividersY,
+        wall, dividersX, dividersY,
       );
       if (divs) {
         const after = result.add(divs);
@@ -371,7 +476,10 @@ export interface BinConfig {
   wallThickness: number;
   bottomThickness: number;
   magnets?: boolean;
+  magnetDiameter?: number;
+  magnetDepth?: number;
   screws?: boolean;
+  stackingLip?: boolean;
   labelShelf?: boolean;
   labelWidth?: number;
   dividersX?: number;

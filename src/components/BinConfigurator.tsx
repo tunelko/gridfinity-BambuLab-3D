@@ -124,9 +124,26 @@ export default memo(function BinConfigurator({ bin }: Props) {
             />
           </Field>
         )}
+        <Toggle label="Stacking Lip" checked={bin.stackingLip} onChange={(v) => update({ stackingLip: v })} />
         <Toggle label="Magnet Holes" checked={bin.magnets} onChange={(v) => update({ magnets: v })} />
         <Toggle label="Screw Holes (M3)" checked={bin.screws} onChange={(v) => update({ screws: v })} />
       </div>
+      {bin.magnets && (
+        <div className="flex" style={{ gap: 10, marginTop: 8 }}>
+          <NumInput
+            label="Mag ⌀ (mm)" value={bin.magnetDiameter ?? GF.MAGNET_DIAMETER}
+            min={3} max={10} step={0.5}
+            onChange={(v) => update({ magnetDiameter: v })}
+            onClamp={(v) => clampUpdate('magnetDiameter', v, 3, 10)}
+          />
+          <NumInput
+            label="Mag H (mm)" value={bin.magnetDepth ?? GF.MAGNET_DEPTH}
+            min={1} max={6} step={0.5}
+            onChange={(v) => update({ magnetDepth: v })}
+            onClamp={(v) => clampUpdate('magnetDepth', v, 1, 6)}
+          />
+        </div>
+      )}
 
       <SectionHeader sub>DIVIDERS</SectionHeader>
       <div className="flex" style={{ gap: 10 }}>
@@ -215,15 +232,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function NumInput({ label, value, min, max, onChange, onClamp }: {
-  label: string; value: number; min: number; max: number;
+function NumInput({ label, value, min, max, step, onChange, onClamp }: {
+  label: string; value: number; min: number; max: number; step?: number;
   onChange: (v: number) => void; onClamp?: (v: number) => void;
 }) {
   return (
     <div className="flex items-center" style={{ gap: 6 }}>
       <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{label}:</span>
       <input
-        type="number" min={min} max={max} value={value}
+        type="number" min={min} max={max} step={step ?? 1} value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         onBlur={(e) => onClamp?.(Number(e.target.value))}
         className="rounded text-center"
