@@ -2,7 +2,10 @@ import type { ManifoldToplevel } from 'manifold-3d';
 import { GF } from './constants';
 import { SPEC } from './spec';
 
-const SEGMENTS_PER_CORNER = 16;
+// Curve tessellation — set per generation by quality ('preview' uses fewer
+// segments for fast interactive CSG; 'export' full quality for printing).
+let SEGMENTS_PER_CORNER = 16;
+let CYLINDER_SEGMENTS = 32;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -72,6 +75,17 @@ function unionAll(wasm: ManifoldToplevel, parts: any[]): any {
   return result;
 }
 
+/**
+ * Lazy-union of provably DISJOINT manifolds (pure topology, no boolean cost).
+ * Only valid when parts cannot touch or overlap. Deletes all inputs.
+ */
+function composeAll(wasm: ManifoldToplevel, parts: any[]): any {
+  if (parts.length === 0) return wasm.Manifold.cube([0.001, 0.001, 0.001], true);
+  const out = wasm.Manifold.compose(parts);
+  for (const p of parts) p.delete();
+  return out;
+}
+
 // ── Magnet & Screw Holes ─────────────────────────────────────────────────────
 
 /**
@@ -116,12 +130,13 @@ function createMagnetHoles(
   const positions = cellHolePositions(unitsW, unitsD, specHoleOffset(r));
 
   for (const [px, py] of positions) {
-    const hole = wasm.Manifold.cylinder(depth, r, r, 32);
+    const hole = wasm.Manifold.cylinder(depth, r, r, CYLINDER_SEGMENTS);
     const pos = hole.translate([px, py, 0]);
     hole.delete();
     holes.push(pos);
   }
-  return unionAll(wasm, holes);
+  // Holes are ≥16mm apart center-to-center — disjoint by construction.
+  return composeAll(wasm, holes);
 }
 
 function createScrewHoles(
@@ -132,12 +147,12 @@ function createScrewHoles(
   const positions = cellHolePositions(unitsW, unitsD, specHoleOffset(r));
 
   for (const [px, py] of positions) {
-    const hole = wasm.Manifold.cylinder(GF.BASE_TOTAL_HEIGHT, r, r, 32);
+    const hole = wasm.Manifold.cylinder(GF.BASE_TOTAL_HEIGHT, r, r, CYLINDER_SEGMENTS);
     const pos = hole.translate([px, py, 0]);
     hole.delete();
     holes.push(pos);
   }
-  return unionAll(wasm, holes);
+  return composeAll(wasm, holes);
 }
 
 // ── Label Shelf ──────────────────────────────────────────────────────────────
@@ -495,51 +510,12 @@ export interface BinConfig {
   dividersY?: number;
 }
 
-// ── PREVIEW geometry (for Three.js viewport) ─────────────────────────────────
+// ── Geometry generation ──────────────────────────────────────────────────────
 //
-// Flat base: single solid slab at full bin width, z=0→4.75.
-// No feet, no steps, no chamfers.
-// Body: straight vertical roundedBox, hollowed.
-// Includes: label shelf, dividers, magnet/screw holes.
-
-export function generateBinPreview(
-  wasm: ManifoldToplevel,
-  config: BinConfig,
-): any {
-  const outerW = config.w * GF.CELL_SIZE - GF.TOLERANCE;
-  const outerD = config.d * GF.CELL_SIZE - GF.TOLERANCE;
-  const bodyH = bodyHeight(config.h);
-  const bodyStartZ = GF.BASE_TOTAL_HEIGHT;
-
-  const r = Math.min(config.cornerRadius, outerW / 2, outerD / 2);
-
-  // 1. Flat base (z=0 → z=4.75)
-  const base = roundedBox(wasm, outerW, outerD, bodyStartZ, r);
-
-  // 2. Hollow body (z=4.75 → top)
-  const hollowBody = createHollowBody(
-    wasm, outerW, outerD, bodyH, bodyStartZ,
-    config.wallThickness, config.bottomThickness, r,
-  );
-
-  // 3. Union base + body
-  let bin = base.add(hollowBody);
-  base.delete();
-  hollowBody.delete();
-
-  // 4. Magnet & screw holes
-  bin = applyHoles(wasm, bin, config);
-
-  // 5. Label shelf + dividers
-  bin = applyFeatures(wasm, bin, config);
-
-  return bin;
-}
-
-// ── EXPORT geometry (for 3MF) ────────────────────────────────────────────────
-//
-// Full 5-layer Z-profile base per cell with exact dimensions for printing.
-// Includes all features: label shelf, dividers, holes.
+// ONE generator for both the 3D preview and the 3MF export — what you see is
+// what you print. `quality` only changes curve tessellation:
+//   'preview' → coarser corners/cylinders for fast interactive CSG
+//   'export'  → full resolution for printing
 
 // Official Gridfinity foot Z-profile per cell (cell = 41.5mm after tolerance),
 // values from SPEC.FOOT — see spec.ts. Bottom → top:
@@ -608,13 +584,20 @@ function createExportCellBases(wasm: ManifoldToplevel, unitsW: number, unitsD: n
       cells.push(translated);
     }
   }
-  return unionAll(wasm, cells);
+  // Feet are separated by the 0.5mm inter-cell V-groove — disjoint.
+  return composeAll(wasm, cells);
 }
 
-export function generateBinExport(
+export type GeometryQuality = 'preview' | 'export';
+
+export function generateBin(
   wasm: ManifoldToplevel,
   config: BinConfig,
+  quality: GeometryQuality = 'export',
 ): any {
+  SEGMENTS_PER_CORNER = quality === 'preview' ? 8 : 16;
+  CYLINDER_SEGMENTS = quality === 'preview' ? 20 : 32;
+
   const outerW = config.w * GF.CELL_SIZE - GF.TOLERANCE;
   const outerD = config.d * GF.CELL_SIZE - GF.TOLERANCE;
   const bodyH = bodyHeight(config.h);
@@ -641,8 +624,16 @@ export function generateBinExport(
   // 4. Holes
   bin = applyHoles(wasm, bin, config);
 
-  // 5. Label shelf + dividers
+  // 5. Stacking lip + label shelf + dividers
   bin = applyFeatures(wasm, bin, config);
 
   return bin;
+}
+
+export function generateBinPreview(wasm: ManifoldToplevel, config: BinConfig): any {
+  return generateBin(wasm, config, 'preview');
+}
+
+export function generateBinExport(wasm: ManifoldToplevel, config: BinConfig): any {
+  return generateBin(wasm, config, 'export');
 }
