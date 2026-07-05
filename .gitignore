@@ -7,3 +7,9 @@ dev-dist/
 *.log
 .DS_Store
 .vite/
+
+# build artifacts
+*.tsbuildinfo
+
+# local agent config
+.claude/

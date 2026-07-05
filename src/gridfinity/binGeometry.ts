@@ -399,6 +399,10 @@ function applyHoles(wasm: ManifoldToplevel, bin: any, config: BinConfig): any {
 function applyFeatures(wasm: ManifoldToplevel, bin: any, config: BinConfig): any {
   let result = bin;
 
+  const labelWidth = config.labelWidth ?? GF.LABEL_DEFAULT_WIDTH;
+  const dividersX = config.dividersX ?? 0;
+  const dividersY = config.dividersY ?? 0;
+
   const outerW = config.w * GF.CELL_SIZE - GF.TOLERANCE;
   const outerD = config.d * GF.CELL_SIZE - GF.TOLERANCE;
   const bodyH = config.h * GF.HEIGHT_UNIT;
@@ -426,11 +430,11 @@ function applyFeatures(wasm: ManifoldToplevel, bin: any, config: BinConfig): any
   }
 
   // Label shelf (subtract from front wall)
-  if (config.labelShelf && config.labelWidth > 0 && cavityH > 0) {
+  if (config.labelShelf && labelWidth > 0 && cavityH > 0) {
     try {
       const shelf = createLabelShelf(
         wasm, outerW, outerD, bodyStartZ, bodyTopZ,
-        wall, config.labelWidth, r,
+        wall, labelWidth, r,
       );
       const after = result.subtract(shelf);
       result.delete();
@@ -442,11 +446,11 @@ function applyFeatures(wasm: ManifoldToplevel, bin: any, config: BinConfig): any
   }
 
   // Dividers (add internal walls)
-  if ((config.dividersX > 0 || config.dividersY > 0) && cavityH > 0) {
+  if ((dividersX > 0 || dividersY > 0) && cavityH > 0) {
     try {
       const divs = createDividers(
         wasm, innerW, innerD, cavityStartZ, cavityH,
-        wall, config.dividersX, config.dividersY,
+        wall, dividersX, dividersY,
       );
       if (divs) {
         const after = result.add(divs);
