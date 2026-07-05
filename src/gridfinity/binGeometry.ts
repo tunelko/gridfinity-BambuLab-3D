@@ -273,85 +273,94 @@ function createHollowBody(
 
 // ── Stacking Lip ─────────────────────────────────────────────────────────────
 //
-// The stacking lip is the female counterpart of the base feet, cut into the TOP
-// of the outer wall so an identical bin's feet seat into it when stacked.
+// Official Gridfinity stacking lip: a perimeter PROTRUSION above the top rim
+// whose inner surface is the negative of the foot profile, so the feet of an
+// identical bin dropped on top self-center on the 45° seat and nest ~4.05mm
+// deep (the foot bottom rests 0.35mm above the rim).
 //
-// To guarantee a perfect fit between two identical bins, the lip is derived from
-// the SAME profile as the foot — we build a "negative" solid shaped like the foot
-// (chamfer + walls) and subtract it from the top rim. Since the foot of the bin
-// placed on top has exactly this profile, it drops in flush.
+// Inner-face insets from the bin outline (rim at z=R, lip total 4.4mm):
 //
-// Profile (matching the official Gridfinity foot, mirrored at the rim):
-//   The foot rises 0.8 (straight) + 1.6 (chamfer out) + 2.25 (straight) = 4.65mm.
-//   The lip mirrors this into the top: the rim's inner edge steps OUT going down,
-//   forming a seat. We cut a 4.4mm-tall recess (STACKING_LIP_HEIGHT).
+//   z R+4.40  inset 0.70   ← mouth (widest opening, guides the foot in)
+//      ↓ 45° seat chamfer — full-face contact with the foot's 2.15 chamfer
+//   z R+2.95  inset 2.15
+//      ↓ vertical, inset 1.90 (foot straight section 2.15 − 0.25 clearance)
+//   z R+0.00  inset 1.90
+//      ↓ 45° support chamfer merging into the wall (printable underside)
+//   z R−(1.90−wall)  inset wall
 //
-// outerW/outerD/r are the bin's outer dimensions and corner radius.
-// unitsW/unitsD are the cell counts — the seat is built PER CELL so it mirrors
-// the foot grid exactly, letting a stacked bin's feet drop into their own cells.
-// bodyTopZ is the Z of the top rim.
+// Ring cross-sections are not convex, so the lip is built as an outline block
+// MINUS an inner negative assembled from convex hulls of rounded-rect discs
+// (same technique as the foot chamfers — corner radii shrink 1:1 with inset).
 function createStackingLip(
   wasm: ManifoldToplevel,
   outerW: number, outerD: number,
   bodyTopZ: number,
   r: number,
+  wall: number,
 ): any {
-  // Standard Gridfinity stacking lip: a single perimeter recess cut into the top
-  // rim. Two identical bins stack flush because both the lip and the feet follow
-  // the 42mm grid — the recess receives the outer wall of the stacked bin's feet.
-  // Internal dividers do NOT affect this; the lip is purely a perimeter feature.
-  //
-  // Recess = full-footprint block MINUS a seat plug whose profile matches the
-  // foot, so the stacked bin's outer profile drops in. Profile from rim DOWN:
-  //   top ledge:  inset 1.90 (wall)   z 0.00→ledgeH
-  //   chamfer:    inset 1.90→2.60      h 0.70    ← 45° seat
-  //   drop wall:  inset 2.60           down to lip bottom
-  const lipH = GF.STACKING_LIP_HEIGHT; // 3.0
-  const lipBottomZ = bodyTopZ - lipH;
+  const LIP_H = SPEC.LIP.HEIGHT;                        // 4.40
+  const seatBotInset = SPEC.FOOT.CHAMFER_TOP;           // 2.15
+  const wallInset = seatBotInset - SPEC.CLEARANCE;      // 1.90
+  // Seat bottom (rim-relative): foot chamfer start when seated 0.35 up.
+  const seatBotZ = SPEC.FOOT.CHAMFER_BOTTOM + SPEC.FOOT.STRAIGHT + 0.35; // 2.95
+  const supportH = Math.max(0, wallInset - wall);       // 0.70 @ 1.2mm wall
+  const eps = 0.01;
+  const overshoot = 0.15;
 
-  // Single perimeter ring helper on the full footprint.
-  function ring(insetBot: number, insetTop: number, h: number, zStart: number): any {
-    const wBot = outerW - 2 * insetBot;
-    const dBot = outerD - 2 * insetBot;
-    const rBot = Math.max(0, r - insetBot);
-    if (wBot <= 0 || dBot <= 0 || h <= 0) return null;
-    const poly = createRoundedRectPolygon(wBot, dBot, rBot);
-    const cs = new wasm.CrossSection(poly);
-    let solid: any;
-    if (Math.abs(insetBot - insetTop) > 1e-6) {
-      const wTop = outerW - 2 * insetTop;
-      solid = cs.extrude(h, 0, 0, [wTop / wBot, wTop / wBot]);
-    } else {
-      solid = cs.extrude(h);
-    }
-    cs.delete();
-    const pos = solid.translate([0, 0, zStart]);
-    solid.delete();
+  function disc(inset: number, zTop: number): any {
+    const d = roundedBox(
+      wasm, outerW - 2 * inset, outerD - 2 * inset, eps, Math.max(0, r - inset),
+    );
+    const pos = d.translate([0, 0, zTop - eps]);
+    d.delete();
     return pos;
   }
 
-  // Full-footprint block over the lip region.
-  const outerBlock = roundedBox(wasm, outerW, outerD, lipH + 0.1, r);
-  const outerBlockPos = outerBlock.translate([0, 0, lipBottomZ]);
-  outerBlock.delete();
+  // Outline block spanning support chamfer + lip.
+  const block = roundedBox(wasm, outerW, outerD, supportH + LIP_H, r);
+  const blockPos = block.translate([0, 0, bodyTopZ - supportH]);
+  block.delete();
 
-  // Seat plug (single perimeter). Heights from lip bottom up:
-  //   drop wall:  inset 2.60          h 1.20
-  //   chamfer:    inset 2.60→1.90     h 0.70 (seats the foot)
-  //   top ledge:  inset 1.90          h remaining (+overshoot)
-  const dropH = 1.20;
-  const chamH = 0.70;
-  const ledgeH = lipH - dropH - chamH;
-  const dropWall = ring(2.60, 2.60, dropH, lipBottomZ);
-  const chamfer = ring(2.60, 1.90, chamH, lipBottomZ + dropH);
-  const topLedge = ring(1.90, 1.90, ledgeH + 0.2, lipBottomZ + dropH + chamH);
-  const parts = [dropWall, chamfer, topLedge].filter(Boolean);
-  const plug = unionAll(wasm, parts);
+  const negatives: any[] = [];
 
-  const recess = outerBlockPos.subtract(plug);
-  outerBlockPos.delete();
-  plug.delete();
-  return recess;
+  // Support chamfer: inset wall @ (R − supportH) → inset 1.90 @ R.
+  // Cross-sections here NARROW upward, so the cone binds to the discs' TOP
+  // edges — place those at exact heights for a true 45°.
+  if (supportH > 0) {
+    const s0 = disc(wall, bodyTopZ - supportH);
+    const s1 = disc(wallInset, bodyTopZ);
+    negatives.push(wasm.Manifold.hull([s0, s1]));
+    s0.delete(); s1.delete();
+  }
+
+  // Vertical section: inset 1.90, z R → R+2.95.
+  const vPoly = createRoundedRectPolygon(
+    outerW - 2 * wallInset, outerD - 2 * wallInset, Math.max(0, r - wallInset),
+  );
+  const vCs = new wasm.CrossSection(vPoly);
+  const vSolid = vCs.extrude(seatBotZ + eps);
+  vCs.delete();
+  const vPos = vSolid.translate([0, 0, bodyTopZ]);
+  vSolid.delete();
+  negatives.push(vPos);
+
+  // Seat chamfer: inset 2.15 @ R+2.95 → past the lip top for a clean cut
+  // (inset 0.70 at R+4.40, continuing the 45° slope). Cross-sections widen
+  // upward → cone binds to BOTTOM edges; both placed at exact heights so the
+  // seat plane is coplanar with the foot's 2.15 chamfer.
+  const c0 = disc(seatBotInset, bodyTopZ + seatBotZ + eps);
+  const c1 = disc(
+    seatBotInset - (LIP_H - seatBotZ) - overshoot,
+    bodyTopZ + LIP_H + overshoot + eps,
+  );
+  negatives.push(wasm.Manifold.hull([c0, c1]));
+  c0.delete(); c1.delete();
+
+  const negative = unionAll(wasm, negatives);
+  const lip = blockPos.subtract(negative);
+  blockPos.delete();
+  negative.delete();
+  return lip;
 }
 
 function applyHoles(wasm: ManifoldToplevel, bin: any, config: BinConfig): any {
@@ -397,7 +406,7 @@ function applyFeatures(wasm: ManifoldToplevel, bin: any, config: BinConfig): any
 
   const outerW = config.w * GF.CELL_SIZE - GF.TOLERANCE;
   const outerD = config.d * GF.CELL_SIZE - GF.TOLERANCE;
-  const bodyH = config.h * GF.HEIGHT_UNIT;
+  const bodyH = bodyHeight(config.h);
   const bodyStartZ = GF.BASE_TOTAL_HEIGHT;
   const bodyTopZ = bodyStartZ + bodyH;
   const r = Math.min(config.cornerRadius, outerW / 2, outerD / 2);
@@ -408,11 +417,11 @@ function applyFeatures(wasm: ManifoldToplevel, bin: any, config: BinConfig): any
   const cavityStartZ = bodyStartZ + bottom;
   const cavityH = bodyH - bottom;
 
-  // Stacking lip (recess cut into the top rim so identical bins stack flush)
+  // Stacking lip (protrusion added above the rim so identical bins nest)
   if (config.stackingLip && cavityH > 0) {
     try {
-      const lip = createStackingLip(wasm, outerW, outerD, bodyTopZ, r);
-      const after = result.subtract(lip);
+      const lip = createStackingLip(wasm, outerW, outerD, bodyTopZ, r, wall);
+      const after = result.add(lip);
       result.delete();
       lip.delete();
       result = after;
@@ -460,6 +469,14 @@ function applyFeatures(wasm: ManifoldToplevel, bin: any, config: BinConfig): any
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
+/**
+ * Body height above the base. Per spec, TOTAL bin height = u × 7mm with the
+ * 4.75mm base included (the stacking lip protrudes above and doesn't count).
+ */
+function bodyHeight(units: number): number {
+  return Math.max(0.5, units * GF.HEIGHT_UNIT - GF.BASE_TOTAL_HEIGHT);
+}
+
 export interface BinConfig {
   w: number;
   d: number;
@@ -491,7 +508,7 @@ export function generateBinPreview(
 ): any {
   const outerW = config.w * GF.CELL_SIZE - GF.TOLERANCE;
   const outerD = config.d * GF.CELL_SIZE - GF.TOLERANCE;
-  const bodyH = config.h * GF.HEIGHT_UNIT;
+  const bodyH = bodyHeight(config.h);
   const bodyStartZ = GF.BASE_TOTAL_HEIGHT;
 
   const r = Math.min(config.cornerRadius, outerW / 2, outerD / 2);
@@ -550,9 +567,12 @@ function createExportCellBase(wasm: ManifoldToplevel): any {
     return pos;
   }
 
-  // Bottom chamfer: 35.60 @ z0 → 37.20 @ z0.80
+  // Bottom chamfer: 35.60 @ z0 → 37.20 @ z0.80.
+  // Disc Z placement: the hull cone binds to each disc's BOTTOM edge here
+  // (cross-sections widen upward), so both bottom edges sit at exact heights
+  // to keep the cone at exactly 45° — the mating faces must be coplanar.
   const b0 = disc(insetLow, eps);
-  const b1 = disc(insetMid, CHAMFER_BOTTOM);
+  const b1 = disc(insetMid, CHAMFER_BOTTOM + eps);
   const bottomChamfer = wasm.Manifold.hull([b0, b1]);
   b0.delete(); b1.delete();
 
@@ -566,9 +586,10 @@ function createExportCellBase(wasm: ManifoldToplevel): any {
   const straight = midSolid.translate([0, 0, CHAMFER_BOTTOM]);
   midSolid.delete();
 
-  // Top chamfer: 37.20 @ z2.60 → 41.50 @ z4.75
+  // Top chamfer: 37.20 @ z2.60 → 41.50 @ z4.75 (bottom edges exact, as above;
+  // t1 overshoots 0.01 into the body, which the union absorbs)
   const t0 = disc(insetMid, CHAMFER_BOTTOM + STRAIGHT + eps);
-  const t1 = disc(0, HEIGHT);
+  const t1 = disc(0, HEIGHT + eps);
   const topChamfer = wasm.Manifold.hull([t0, t1]);
   t0.delete(); t1.delete();
 
@@ -596,7 +617,7 @@ export function generateBinExport(
 ): any {
   const outerW = config.w * GF.CELL_SIZE - GF.TOLERANCE;
   const outerD = config.d * GF.CELL_SIZE - GF.TOLERANCE;
-  const bodyH = config.h * GF.HEIGHT_UNIT;
+  const bodyH = bodyHeight(config.h);
   const bodyStartZ = GF.BASE_TOTAL_HEIGHT;
 
   const r = Math.min(config.cornerRadius, outerW / 2, outerD / 2);

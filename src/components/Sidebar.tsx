@@ -152,7 +152,7 @@ export default function Sidebar() {
       if (!groups[key]) {
         const outerW = b.w * GF.CELL_SIZE - GF.TOLERANCE;
         const outerD = b.d * GF.CELL_SIZE - GF.TOLERANCE;
-        const totalH = b.h * GF.HEIGHT_UNIT + GF.BASE_TOTAL_HEIGHT;
+        const totalH = b.h * GF.HEIGHT_UNIT;
         const innerW = outerW - 2 * GF.WALL_THICKNESS;
         const innerD = outerD - 2 * GF.WALL_THICKNESS;
         const innerH = totalH - GF.BOTTOM_THICKNESS - GF.BASE_TOTAL_HEIGHT;
@@ -368,7 +368,7 @@ export default function Sidebar() {
     const labels = bins.map((b) => {
       const wMM = b.w * GF.CELL_SIZE - GF.TOLERANCE;
       const dMM = b.d * GF.CELL_SIZE - GF.TOLERANCE;
-      const hMM = b.h * GF.HEIGHT_UNIT + GF.BASE_TOTAL_HEIGHT;
+      const hMM = b.h * GF.HEIGHT_UNIT;
       return `
         <div style="border:1px solid #333;border-radius:6px;padding:10px 14px;display:inline-block;margin:4px;min-width:140px;font-family:monospace;font-size:12px;page-break-inside:avoid;">
           <div style="font-size:14px;font-weight:bold;margin-bottom:4px;">${b.label || 'Bin'}</div>

@@ -20,7 +20,7 @@ export default memo(function BinConfigurator({ bin }: Props) {
 
   const outerW = bin.w * GF.CELL_SIZE - GF.TOLERANCE;
   const outerD = bin.d * GF.CELL_SIZE - GF.TOLERANCE;
-  const totalH = bin.h * GF.HEIGHT_UNIT + GF.BASE_TOTAL_HEIGHT;
+  const totalH = bin.h * GF.HEIGHT_UNIT;
 
   return (
     <div className="animate-slide-up" style={{ padding: 16, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>

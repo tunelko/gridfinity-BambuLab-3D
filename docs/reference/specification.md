@@ -25,7 +25,8 @@ For a bin of size **W x D x H** (in grid units):
 |-------------|---------|-------------------|
 | Outer width | W × 42mm - 0.5mm | 83.5 mm |
 | Outer depth | D × 42mm - 0.5mm | 83.5 mm |
-| Total height | H × 7mm + 4.75mm | 25.75 mm |
+| Total height | H × 7mm (base included) | 21.00 mm |
+| Stacking lip | +4.4mm above the rim (optional) | 25.40 mm |
 | Inner width | Outer - 2 × wall | 81.1 mm |
 | Inner depth | Outer - 2 × wall | 81.1 mm |
 
@@ -52,7 +53,11 @@ hole while keeping the 26mm grid.
 
 ## Stacking Lip
 
-The stacking lip adds a 4.4mm rim at the top of the bin that mirrors the baseplate socket profile, allowing bins to be stacked on top of each other.
+The stacking lip is a 4.4mm **protrusion above the top rim** whose inner surface is the
+negative of the foot profile (45° seat + vertical section + support chamfer, insets
+0.7 / 1.9 / 2.15mm). A stacked bin's feet drop in, self-center on the 45° seat and
+nest ~4mm deep, resting 0.35mm above the rim. Stacking is verified by automated
+mating tests (seat contact, lateral lock, insertion clearance).
 
 ## Resources
 

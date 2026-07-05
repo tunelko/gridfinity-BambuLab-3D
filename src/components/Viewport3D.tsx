@@ -34,7 +34,7 @@ function animateCamera(
 function binWorldCenter(bin: Bin, gridCols: number, gridRows: number) {
   const cx = (bin.x + bin.w / 2) * GF.CELL_SIZE - (gridCols * GF.CELL_SIZE) / 2;
   const cz = (bin.y + bin.d / 2) * GF.CELL_SIZE - (gridRows * GF.CELL_SIZE) / 2;
-  const h = bin.h * GF.HEIGHT_UNIT + GF.BASE_TOTAL_HEIGHT;
+  const h = bin.h * GF.HEIGHT_UNIT;
   return { cx, cz, h };
 }
 
@@ -351,7 +351,7 @@ export default function Viewport3D() {
     bins.forEach((bin) => {
       const outerW = bin.w * GF.CELL_SIZE - GF.TOLERANCE;
       const outerD = bin.d * GF.CELL_SIZE - GF.TOLERANCE;
-      const binTotalH = bin.h * GF.HEIGHT_UNIT + GF.BASE_TOTAL_HEIGHT;
+      const binTotalH = bin.h * GF.HEIGHT_UNIT;
       const cx = (bin.x + bin.w / 2) * GF.CELL_SIZE - (gridCols * GF.CELL_SIZE) / 2;
       const cz = (bin.y + bin.d / 2) * GF.CELL_SIZE - (gridRows * GF.CELL_SIZE) / 2;
 

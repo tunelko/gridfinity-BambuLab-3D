@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import Module from 'manifold-3d';
 import type { ManifoldToplevel } from 'manifold-3d';
 import { GF } from './constants';
+import { SPEC } from './spec';
 import { generateBinExport, generateBinPreview, type BinConfig } from './binGeometry';
 
 let wasm: ManifoldToplevel;
@@ -145,6 +146,51 @@ describe('magnet holes on the official 26mm grid', () => {
   }, 120_000);
 });
 
+// ── F2: stacking — two identical bins must physically mate ──────────────────
+//
+// Seated position: the foot's 2.15 top chamfer rests full-face on the lip's
+// 45° seat, leaving the foot bottom 0.35mm above the rim (rim = u×7).
+
+describe('stacking: two identical bins mate', () => {
+  const config = baseConfig({ w: 2, d: 2, h: 3, stackingLip: true });
+  const seatZ = 3 * GF.HEIGHT_UNIT + 0.35;
+  let bottom: any;
+
+  beforeAll(() => {
+    bottom = generateBinExport(wasm, config);
+  }, 120_000);
+
+  function overlapAt(dx: number, dy: number, dz: number): number {
+    const top = bottom.translate([dx, dy, dz]);
+    const inter = bottom.intersect(top);
+    const v = inter.volume();
+    top.delete();
+    inter.delete();
+    return v;
+  }
+
+  it('no interpenetration at the seated position', () => {
+    expect(overlapAt(0, 0, seatZ)).toBeLessThan(0.01);
+  }, 120_000);
+
+  it('actually rests there: 0.3mm lower collides with the seat', () => {
+    expect(overlapAt(0, 0, seatZ - 0.3)).toBeGreaterThan(0.5);
+  }, 120_000);
+
+  it('laterally locked: 1mm sideways collides with the lip', () => {
+    expect(overlapAt(1, 0, seatZ)).toBeGreaterThan(0.5);
+    expect(overlapAt(0, 1, seatZ)).toBeGreaterThan(0.5);
+  }, 120_000);
+
+  it('mouth guides an off-center bin down the 45° seat', () => {
+    // A bin off-center by s can descend to lift ≈ s along the guided path
+    // (contact-sliding on the seat); verify a 0.2mm-off bin fits at the
+    // corresponding height with margin. Descending further, the seat forces
+    // it to center — that is the self-centering insertion.
+    expect(overlapAt(0.2, 0, seatZ + 2.1)).toBeLessThan(0.01);
+  }, 120_000);
+});
+
 for (const generator of [generateBinExport, generateBinPreview] as const) {
   const mode = generator === generateBinExport ? 'export' : 'preview';
 
@@ -164,10 +210,10 @@ for (const generator of [generateBinExport, generateBinPreview] as const) {
           expect(bb.max[1] - bb.min[1]).toBeCloseTo(config.d * GF.CELL_SIZE - GF.TOLERANCE, 2);
           expect(bb.min[2]).toBeCloseTo(0, 2);
 
-          // Height: current formula base + h×7. NOTE: changes in F2 (spec heights u×7 total).
-          const expectedTop = GF.BASE_TOTAL_HEIGHT + config.h * GF.HEIGHT_UNIT;
-          expect(bb.max[2]).toBeGreaterThan(GF.BASE_TOTAL_HEIGHT);
-          expect(bb.max[2]).toBeLessThanOrEqual(expectedTop + EPS);
+          // Spec heights: total = u×7 (base included); the lip protrudes 4.4 above.
+          const expectedTop =
+            config.h * GF.HEIGHT_UNIT + (config.stackingLip ? SPEC.LIP.HEIGHT : 0);
+          expect(bb.max[2]).toBeCloseTo(expectedTop, 1);
 
           // The exact mesh buffers written to the 3MF must themselves be manifold
           const rebuilt = meshRoundtrip(bin);
