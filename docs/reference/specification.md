@@ -31,23 +31,24 @@ For a bin of size **W x D x H** (in grid units):
 
 ## Z-Profile Base
 
-The Gridfinity base uses a stepped chamfer profile with 5 layers for interlocking with the baseplate:
+Each cell has a foot following the official Gridfinity profile (45° chamfers), bottom to top:
 
 ```
-Layer 5: Full bin footprint (main body)
-Layer 4: Chamfer transition
-Layer 3: Intermediate step
-Layer 2: Chamfer transition
-Layer 1: Narrow foot (bottom contact)
+z 0.00 → 0.80   45° chamfer   width 35.60 → 37.20 mm
+z 0.80 → 2.60   vertical      width 37.20 mm
+z 2.60 → 4.75   45° chamfer   width 37.20 → 41.50 mm
 ```
 
-This profile allows bins to snap into baseplates securely while remaining easy to remove.
+The foot corner radius follows the inset (3.75mm at the top, 0.80mm at the bottom), so bins
+self-center and seat flush in any standard baseplate. Multi-cell bins have one foot per cell
+with the spec 0.5mm V-groove between them.
 
 ## Magnet Holes
 
-Magnet holes are placed at the corners of each cell unit within a bin. Shared internal corners are deduplicated to avoid overlapping holes.
-
-The inset from the bin edge is dynamic: `max(8.0mm, cornerRadius + holeRadius + 1.0mm)`.
+Magnet hole centers form the official **26 × 26 mm square centered in each cell**
+(13mm from the cell center), matching magnetized baseplates. The standard hole is
+⌀6.5 × 2.4mm (6×2mm magnet + press-fit clearance); custom magnet sizes adjust the
+hole while keeping the 26mm grid.
 
 ## Stacking Lip
 

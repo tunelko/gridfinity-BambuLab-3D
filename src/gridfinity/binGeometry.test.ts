@@ -51,6 +51,100 @@ const CASES: Case[] = [
   { name: '3x2x2 dividers', config: baseConfig({ w: 3, d: 2, h: 2, dividersX: 3, dividersY: 2 }) },
 ];
 
+// ── F1: official foot Z-profile (export geometry) ───────────────────────────
+//
+//   z 0.00→0.80  45° chamfer  35.60 → 37.20
+//   z 0.80→2.60  vertical     37.20
+//   z 2.60→4.75  45° chamfer  37.20 → 41.50
+
+describe('official foot Z-profile', () => {
+  let bin: any;
+
+  beforeAll(() => {
+    bin = generateBinExport(wasm, baseConfig());
+  });
+
+  function widthAt(z: number): number {
+    const cs = bin.slice(z);
+    const b = cs.bounds();
+    const w = b.max[0] - b.min[0];
+    cs.delete();
+    return w;
+  }
+
+  it('bottom chamfer: ~35.6mm at z≈0', () => {
+    expect(widthAt(0.02)).toBeCloseTo(35.6 + 2 * 0.02, 1);
+  });
+
+  it('vertical section: 37.2mm at z=1.5', () => {
+    expect(widthAt(1.5)).toBeCloseTo(37.2, 2);
+  });
+
+  it('top chamfer at 45°: ~39.35mm at z=3.675', () => {
+    expect(Math.abs(widthAt(3.675) - 39.35)).toBeLessThan(0.08);
+  });
+
+  it('foot reaches full 41.5mm cell width at the top', () => {
+    expect(Math.abs(widthAt(4.70) - 41.4)).toBeLessThan(0.08);
+    expect(widthAt(6.0)).toBeCloseTo(41.5, 2); // body above
+  });
+
+  it('foot corners keep the spec radius (not proportionally scaled)', () => {
+    // At z=4.70 the inset is 0.05 → spec corner r = 3.70.
+    // area = w² − (4−π)·r². A scaled-extrude foot would have r≈1.78 (+9mm²).
+    const cs = bin.slice(4.70);
+    const b = cs.bounds();
+    const w = b.max[0] - b.min[0];
+    const expected = w * w - (4 - Math.PI) * 3.70 * 3.70;
+    expect(Math.abs(cs.area() - expected)).toBeLessThan(3);
+    cs.delete();
+  });
+
+  it('multi-cell: per-cell feet with 0.5mm V-grooves between cells', () => {
+    const twoWide = generateBinExport(wasm, baseConfig({ w: 2 }));
+    try {
+      const cs = twoWide.slice(1.5); // vertical section: 37.2 per cell, 42 pitch
+      const bnd = cs.bounds();
+      expect(bnd.max[0] - bnd.min[0]).toBeCloseTo(42 + 37.2, 1);
+      cs.delete();
+    } finally {
+      twoWide.delete();
+    }
+  });
+});
+
+describe('magnet holes on the official 26mm grid', () => {
+  // Probe just inside the rim of a hole centered at (13,13): only empty if
+  // the hole center is at the spec 13mm offset (a 12.75mm-offset hole ends
+  // at x=16.0 and leaves this probe solid).
+  function probeVolume(target: any): number {
+    const probe = wasm.Manifold.cube([0.06, 0.4, 0.5]).translate([16.15, 12.8, 0.5]);
+    const hit = target.intersect(probe);
+    const v = hit.volume();
+    probe.delete();
+    hit.delete();
+    return v;
+  }
+
+  it('hole rim sits at 13 + r from the cell center', () => {
+    const withMagnets = generateBinExport(wasm, baseConfig({ magnets: true }));
+    try {
+      expect(probeVolume(withMagnets)).toBeLessThan(1e-6);
+    } finally {
+      withMagnets.delete();
+    }
+  }, 120_000);
+
+  it('same spot is solid without magnets', () => {
+    const solid = generateBinExport(wasm, baseConfig());
+    try {
+      expect(probeVolume(solid)).toBeGreaterThan(0.01);
+    } finally {
+      solid.delete();
+    }
+  }, 120_000);
+});
+
 for (const generator of [generateBinExport, generateBinPreview] as const) {
   const mode = generator === generateBinExport ? 'export' : 'preview';
 
