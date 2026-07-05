@@ -1,5 +1,6 @@
 import type { ManifoldToplevel } from 'manifold-3d';
 import { GF } from './constants';
+import { SPEC } from './spec';
 
 const SEGMENTS_PER_CORNER = 16;
 
@@ -74,23 +75,23 @@ function unionAll(wasm: ManifoldToplevel, parts: any[]): any {
 // ── Magnet & Screw Holes ─────────────────────────────────────────────────────
 
 /**
- * Compute safe hole inset so cylinders clear the corner radius.
- * inset = max(8.0, cornerRadius + holeRadius + 1.0mm clearance)
+ * Spec hole offset from each cell center: 26mm spacing → ±13mm.
+ * Clamped inward only for oversized custom magnets so the hole stays
+ * inside the 35.6mm foot bottom (17.8mm half-width).
  */
-function safeHoleInset(cornerRadius: number, holeRadius: number): number {
-  return Math.max(8.0, cornerRadius + holeRadius + 1.0);
+function specHoleOffset(holeRadius: number): number {
+  const footHalfBottom =
+    (GF.CELL_SIZE - GF.TOLERANCE) / 2 - (SPEC.FOOT.CHAMFER_BOTTOM + SPEC.FOOT.CHAMFER_TOP);
+  return Math.min(SPEC.MAGNET.SPACING / 2, footHalfBottom - holeRadius - 0.5);
 }
 
 /**
- * Collect unique hole positions across all cell corners, deduplicating
- * shared internal corners in multi-cell bins.
+ * Hole positions: a 26×26mm square centered in each cell of the bin
+ * (official magnet grid).
  */
 function cellHolePositions(
-  unitsW: number, unitsD: number, inset: number,
+  unitsW: number, unitsD: number, holeOffset: number,
 ): [number, number][] {
-  const halfCell = (GF.CELL_SIZE - GF.TOLERANCE) / 2;
-  const holeOffset = halfCell - inset;
-  const seen = new Set<string>();
   const positions: [number, number][] = [];
 
   for (let cx = 0; cx < unitsW; cx++) {
@@ -98,14 +99,7 @@ function cellHolePositions(
       const ox = (cx - (unitsW - 1) / 2) * GF.CELL_SIZE;
       const oy = (cy - (unitsD - 1) / 2) * GF.CELL_SIZE;
       for (const [dx, dy] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
-        const px = ox + dx * holeOffset;
-        const py = oy + dy * holeOffset;
-        // Round to 0.01mm to deduplicate overlapping corners
-        const key = `${Math.round(px * 100)},${Math.round(py * 100)}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          positions.push([px, py]);
-        }
+        positions.push([ox + dx * holeOffset, oy + dy * holeOffset]);
       }
     }
   }
@@ -113,14 +107,13 @@ function cellHolePositions(
 }
 
 function createMagnetHoles(
-  wasm: ManifoldToplevel, unitsW: number, unitsD: number, cornerRadius: number,
+  wasm: ManifoldToplevel, unitsW: number, unitsD: number,
   magnetDiameter: number, magnetDepth: number,
 ): any {
   const holes: any[] = [];
   const r = (magnetDiameter + 0.5) / 2; // +0.5mm clearance for press-fit
   const depth = magnetDepth + 0.4;      // +0.4mm so magnet sits flush
-  const inset = safeHoleInset(cornerRadius, r);
-  const positions = cellHolePositions(unitsW, unitsD, inset);
+  const positions = cellHolePositions(unitsW, unitsD, specHoleOffset(r));
 
   for (const [px, py] of positions) {
     const hole = wasm.Manifold.cylinder(depth, r, r, 32);
@@ -132,12 +125,11 @@ function createMagnetHoles(
 }
 
 function createScrewHoles(
-  wasm: ManifoldToplevel, unitsW: number, unitsD: number, cornerRadius: number,
+  wasm: ManifoldToplevel, unitsW: number, unitsD: number,
 ): any {
   const holes: any[] = [];
   const r = GF.SCREW_HOLE_DIAMETER / 2;
-  const inset = safeHoleInset(cornerRadius, r);
-  const positions = cellHolePositions(unitsW, unitsD, inset);
+  const positions = cellHolePositions(unitsW, unitsD, specHoleOffset(r));
 
   for (const [px, py] of positions) {
     const hole = wasm.Manifold.cylinder(GF.BASE_TOTAL_HEIGHT, r, r, 32);
@@ -368,7 +360,7 @@ function applyHoles(wasm: ManifoldToplevel, bin: any, config: BinConfig): any {
   if (config.magnets) {
     try {
       const holes = createMagnetHoles(
-        wasm, config.w, config.d, config.cornerRadius,
+        wasm, config.w, config.d,
         config.magnetDiameter ?? GF.MAGNET_DIAMETER,
         config.magnetDepth ?? GF.MAGNET_DEPTH,
       );
@@ -383,7 +375,7 @@ function applyHoles(wasm: ManifoldToplevel, bin: any, config: BinConfig): any {
 
   if (config.screws) {
     try {
-      const holes = createScrewHoles(wasm, config.w, config.d, config.cornerRadius);
+      const holes = createScrewHoles(wasm, config.w, config.d);
       const after = result.subtract(holes);
       result.delete();
       holes.delete();
@@ -532,71 +524,64 @@ export function generateBinPreview(
 // Full 5-layer Z-profile base per cell with exact dimensions for printing.
 // Includes all features: label shelf, dividers, holes.
 
-interface ZSection {
-  zStart: number;
-  height: number;
-  shrinkBot: number;
-  shrinkTop: number;
-  rShrinkBot: number;
-}
-
-// Official Gridfinity base Z-profile per cell (cell = 41.5mm after tolerance).
-// Layer A: 0.00→0.80   vertical, width 37.10 (shrink 4.40 from 41.5)
-// Layer B: 0.80→2.40   45° chamfer, 37.10 → 38.70
-// Layer C: 2.40→4.65   vertical, width 38.70 (shrink 2.80)
-// Layer D handled separately as the top lip (z=4.65→4.75, full cell width 41.50)
-const Z_PROFILE_SECTIONS: ZSection[] = [
-  { zStart: 0.00, height: 0.80, shrinkBot: 4.40, shrinkTop: 4.40, rShrinkBot: 2.20 },
-  { zStart: 0.80, height: 1.60, shrinkBot: 4.40, shrinkTop: 2.80, rShrinkBot: 2.20 },
-  { zStart: 2.40, height: 2.25, shrinkBot: 2.80, shrinkTop: 2.80, rShrinkBot: 1.40 },
-];
-
-function createExportCellBase(wasm: ManifoldToplevel, cornerRadius: number): any {
+// Official Gridfinity foot Z-profile per cell (cell = 41.5mm after tolerance),
+// values from SPEC.FOOT — see spec.ts. Bottom → top:
+//   z 0.00→0.80  45° chamfer  35.60 → 37.20
+//   z 0.80→2.60  vertical     37.20
+//   z 2.60→4.75  45° chamfer  37.20 → 41.50   (meets the bin body flush)
+//
+// Chamfers are built as convex hulls of two thin rounded-rect discs so the
+// corner radius shrinks 1:1 with the inset (true 45° offset surface). A scaled
+// extrude would shrink corners proportionally instead, leaving foot corners
+// too square to enter a baseplate socket.
+function createExportCellBase(wasm: ManifoldToplevel): any {
   const cellSize = GF.CELL_SIZE - GF.TOLERANCE;
-  const sections: any[] = [];
+  const { CHAMFER_BOTTOM, STRAIGHT, CHAMFER_TOP, HEIGHT, CORNER_RADIUS } = SPEC.FOOT;
+  const insetLow = CHAMFER_BOTTOM + CHAMFER_TOP; // 2.95 → width 35.60
+  const insetMid = CHAMFER_TOP;                  // 2.15 → width 37.20
+  const eps = 0.01;
 
-  for (const sec of Z_PROFILE_SECTIONS) {
-    const wBot = cellSize - sec.shrinkBot;
-    const wTop = cellSize - sec.shrinkTop;
-    const rBot = Math.max(0, cornerRadius - sec.rShrinkBot);
-    if (wBot <= 0 || sec.height <= 0) continue;
-
-    const isChamfer = Math.abs(wBot - wTop) > 0.001;
-    const poly = createRoundedRectPolygon(wBot, wBot, rBot);
-    const cs = new wasm.CrossSection(poly);
-
-    let solid: any;
-    if (isChamfer) {
-      const scale = wTop / wBot;
-      solid = cs.extrude(sec.height, 0, 0, [scale, scale]);
-    } else {
-      solid = cs.extrude(sec.height);
-    }
-    cs.delete();
-
-    const translated = solid.translate([0, 0, sec.zStart]);
-    solid.delete();
-    sections.push(translated);
+  // Thin disc of the foot cross-section at a given inset, top face at z.
+  function disc(inset: number, zTop: number): any {
+    const w = cellSize - 2 * inset;
+    const d = roundedBox(wasm, w, w, eps, Math.max(0, CORNER_RADIUS - inset));
+    const pos = d.translate([0, 0, zTop - eps]);
+    d.delete();
+    return pos;
   }
 
-  // Top lip: full cell width, z=4.65→4.75 (0.10mm — joins cells in multi-bin)
-  const lipZStart = 4.65;
-  const lipH = GF.BASE_TOTAL_HEIGHT - lipZStart;
-  const lip = roundedBox(wasm, cellSize, cellSize, lipH, cornerRadius);
-  const lipPos = lip.translate([0, 0, lipZStart]);
-  lip.delete();
-  sections.push(lipPos);
+  // Bottom chamfer: 35.60 @ z0 → 37.20 @ z0.80
+  const b0 = disc(insetLow, eps);
+  const b1 = disc(insetMid, CHAMFER_BOTTOM);
+  const bottomChamfer = wasm.Manifold.hull([b0, b1]);
+  b0.delete(); b1.delete();
 
-  return unionAll(wasm, sections);
+  // Vertical section: 37.20, z 0.80→2.60
+  const midPoly = createRoundedRectPolygon(
+    cellSize - 2 * insetMid, cellSize - 2 * insetMid, CORNER_RADIUS - insetMid,
+  );
+  const midCs = new wasm.CrossSection(midPoly);
+  const midSolid = midCs.extrude(STRAIGHT);
+  midCs.delete();
+  const straight = midSolid.translate([0, 0, CHAMFER_BOTTOM]);
+  midSolid.delete();
+
+  // Top chamfer: 37.20 @ z2.60 → 41.50 @ z4.75
+  const t0 = disc(insetMid, CHAMFER_BOTTOM + STRAIGHT + eps);
+  const t1 = disc(0, HEIGHT);
+  const topChamfer = wasm.Manifold.hull([t0, t1]);
+  t0.delete(); t1.delete();
+
+  return unionAll(wasm, [bottomChamfer, straight, topChamfer]);
 }
 
-function createExportCellBases(wasm: ManifoldToplevel, unitsW: number, unitsD: number, cornerRadius: number): any {
+function createExportCellBases(wasm: ManifoldToplevel, unitsW: number, unitsD: number): any {
   const cells: any[] = [];
   for (let cx = 0; cx < unitsW; cx++) {
     for (let cy = 0; cy < unitsD; cy++) {
       const offsetX = (cx - (unitsW - 1) / 2) * GF.CELL_SIZE;
       const offsetY = (cy - (unitsD - 1) / 2) * GF.CELL_SIZE;
-      const cell = createExportCellBase(wasm, cornerRadius);
+      const cell = createExportCellBase(wasm);
       const translated = cell.translate([offsetX, offsetY, 0]);
       cell.delete();
       cells.push(translated);
@@ -616,35 +601,26 @@ export function generateBinExport(
 
   const r = Math.min(config.cornerRadius, outerW / 2, outerD / 2);
 
-  // 1. Per-cell 5-layer Z-profile bases
-  const cellBases = createExportCellBases(wasm, config.w, config.d, r);
+  // 1. Per-cell official foot profile (reaches full 41.5mm width at z=4.75,
+  //    so the body bottom face seals the base; the 0.5mm V-grooves between
+  //    feet of multi-cell bins stay open underneath, per spec)
+  const base = createExportCellBases(wasm, config.w, config.d);
 
-  // 2. Top lip bridging inter-cell gaps (z=4.65→4.75, 0.10mm)
-  const lipZStart = 4.65;
-  const slabH = bodyStartZ - lipZStart;
-  const slab = roundedBox(wasm, outerW, outerD, slabH, r);
-  const slabPos = slab.translate([0, 0, lipZStart]);
-  slab.delete();
-
-  const base = cellBases.add(slabPos);
-  cellBases.delete();
-  slabPos.delete();
-
-  // 3. Hollow body
+  // 2. Hollow body
   const hollowBody = createHollowBody(
     wasm, outerW, outerD, bodyH, bodyStartZ,
     config.wallThickness, config.bottomThickness, r,
   );
 
-  // 4. Union
+  // 3. Union
   let bin = base.add(hollowBody);
   base.delete();
   hollowBody.delete();
 
-  // 5. Holes
+  // 4. Holes
   bin = applyHoles(wasm, bin, config);
 
-  // 6. Label shelf + dividers
+  // 5. Label shelf + dividers
   bin = applyFeatures(wasm, bin, config);
 
   return bin;
