@@ -1,9 +1,9 @@
 import { useState, useEffect, memo } from 'react';
 import { useStore, type ViewMode, type RenderMode } from '../store/useStore';
 import { GF } from '../gridfinity/constants';
-import { initManifold } from '../hooks/useManifold';
-import { generateBinExport, type BinConfig } from '../gridfinity/binGeometry';
-import { manifoldToTriangleMesh, exportTo3MF, downloadBlob } from '../gridfinity/export3mf';
+import type { BinConfig } from '../gridfinity/binGeometry';
+import { requestMesh } from '../hooks/useManifoldWorker';
+import { exportTo3MF, downloadBlob } from '../gridfinity/export3mf';
 
 // ── Toast ──
 function Toast({ message, onClose }: { message: string; onClose: () => void }) {
@@ -221,9 +221,8 @@ export default function Toolbar() {
     if (binsToExport.length === 0) return;
 
     setExporting(true);
-    setExportProgress('Initializing Manifold...');
+    setExportProgress('Starting export...');
     try {
-      const wasm = await initManifold();
       const meshes: { mesh: { vertices: Float32Array; triangles: Uint32Array }; name: string }[] = [];
 
       for (let i = 0; i < binsToExport.length; i++) {
@@ -241,9 +240,13 @@ export default function Toolbar() {
           dividersX: bin.dividersX, dividersY: bin.dividersY,
         };
 
-        const manifold = generateBinExport(wasm, config);
-        const mesh = manifoldToTriangleMesh(manifold);
-        manifold.delete();
+        // Full-quality CSG runs in the worker — the UI stays responsive and
+        // the progress label actually updates between bins.
+        const { positions, indices } = await requestMesh('export', config);
+
+        // Copy before translating: the worker result is cached and shared;
+        // baking positions in place would corrupt later exports.
+        const mesh = { vertices: new Float32Array(positions), triangles: indices };
 
         if (mode === 'all') {
           const ox = (bin.x + bin.w / 2) * GF.CELL_SIZE - (gridCols * GF.CELL_SIZE) / 2;

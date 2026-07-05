@@ -5,25 +5,6 @@ export interface TriangleMesh {
   triangles: Uint32Array;  // [v0,v1,v2, v0,v1,v2, ...]
 }
 
-/** Convert a Manifold object to our TriangleMesh format. */
-export function manifoldToTriangleMesh(manifoldObj: any): TriangleMesh {
-  const mesh = manifoldObj.getMesh();
-  const numVert: number = mesh.numVert;
-  const numProp: number = mesh.numProp;
-  const vertProps: Float32Array = mesh.vertProperties;
-  const triVerts: Uint32Array = mesh.triVerts;
-
-  const vertices = new Float32Array(numVert * 3);
-  for (let i = 0; i < numVert; i++) {
-    const offset = i * numProp;
-    vertices[i * 3] = vertProps[offset];
-    vertices[i * 3 + 1] = vertProps[offset + 1];
-    vertices[i * 3 + 2] = vertProps[offset + 2];
-  }
-
-  return { vertices, triangles: new Uint32Array(triVerts) };
-}
-
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

@@ -41,7 +41,8 @@ When converting from Manifold to Three.js:
 
 ## Performance
 
-- **Preview geometry**: Simplified base profile (flat) for fast rendering
-- **Export geometry**: Full 5-layer Z-profile base for accurate printing
-- **Web Worker**: Non-blocking CSG prevents UI freezes
-- **Mesh caching**: Avoids redundant CSG operations
+- **One geometry for preview and export**: what you see is what you print (feet,
+  stacking lip, chamfers). Preview uses coarser curve tessellation for speed;
+  export renders full resolution.
+- **Web Worker**: all CSG (preview and 3MF export) runs off the main thread
+- **Mesh caching**: avoids redundant CSG operations

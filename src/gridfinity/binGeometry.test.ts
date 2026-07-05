@@ -101,6 +101,18 @@ describe('official foot Z-profile', () => {
     cs.delete();
   });
 
+  it('preview geometry has the same real feet (unified generator)', () => {
+    const preview = generateBinPreview(wasm, baseConfig());
+    try {
+      const cs = preview.slice(1.5);
+      const b = cs.bounds();
+      expect(b.max[0] - b.min[0]).toBeCloseTo(37.2, 2);
+      cs.delete();
+    } finally {
+      preview.delete();
+    }
+  });
+
   it('multi-cell: per-cell feet with 0.5mm V-grooves between cells', () => {
     const twoWide = generateBinExport(wasm, baseConfig({ w: 2 }));
     try {
