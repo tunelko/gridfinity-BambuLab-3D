@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { useStore } from '../store/useStore';
+import { useStore, binFromPreset } from '../store/useStore';
 import { CELL_PX, screenToGrid } from '../utils/gridMath';
 import { checkCollision } from '../utils/collision';
 import { GF, BIN_GROUPS } from '../gridfinity/constants';
@@ -594,22 +594,7 @@ export default function GridCanvas2D() {
         gridRows,
       );
       if (!collision) {
-        addBin({
-          x: coord.col, y: coord.row,
-          w: preset.w, d: preset.d, h: preset.h ?? 3,
-          cornerRadius: GF.BIN_CORNER_RADIUS,
-          wallThickness: GF.WALL_THICKNESS,
-          bottomThickness: GF.BOTTOM_THICKNESS,
-          stackingLip: preset.stackingLip ?? false,
-          labelShelf: preset.labelShelf ?? false,
-          labelWidth: GF.LABEL_DEFAULT_WIDTH,
-          magnets: preset.magnets ?? false,
-          screws: preset.screws ?? false,
-          dividersX: preset.dividersX ?? 0,
-          dividersY: preset.dividersY ?? 0,
-          color: '', label: preset.name ?? '',
-          group: '',
-        });
+        addBin({ x: coord.col, y: coord.row, ...binFromPreset(preset) });
       }
     } catch { /* ignore invalid data */ }
   }, [getGridCoord, bins, addBin, gridCols, gridRows]);

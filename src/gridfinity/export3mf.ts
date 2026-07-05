@@ -27,8 +27,10 @@ function generateObjects(meshes: { mesh: TriangleMesh; name: string }[]): string
     const volumeId = idx * 2 + 1;
     const objectId = idx * 2 + 2;
 
-    // Volume object: contains the actual mesh geometry
-    xml += `<object id="${volumeId}" type="model">
+    // Volume object: contains the actual mesh geometry.
+    // p:UUID is required on every object/component/item by the production
+    // extension (declared in requiredextensions="p").
+    xml += `<object id="${volumeId}" p:UUID="${generateUUID()}" type="model">
       <mesh>
         <vertices>`;
 
@@ -55,9 +57,9 @@ function generateObjects(meshes: { mesh: TriangleMesh; name: string }[]): string
     `;
 
     // Parent object: references the volume as a component
-    xml += `<object id="${objectId}" type="model" name="${escapeXml(name)}">
+    xml += `<object id="${objectId}" p:UUID="${generateUUID()}" type="model" name="${escapeXml(name)}">
       <components>
-        <component objectid="${volumeId}"/>
+        <component objectid="${volumeId}" p:UUID="${generateUUID()}"/>
       </components>
     </object>
     `;

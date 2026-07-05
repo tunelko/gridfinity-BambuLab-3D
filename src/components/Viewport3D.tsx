@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { useStore, type Bin } from '../store/useStore';
 import { GF } from '../gridfinity/constants';
 import { requestBinMesh, clearMeshCache } from '../hooks/useManifoldWorker';
-import type { BinConfig } from '../gridfinity/binGeometry';
+import { binToConfig } from '../gridfinity/binGeometry';
 
 // ── Smooth camera animation ──
 function animateCamera(
@@ -364,17 +364,7 @@ export default function Viewport3D() {
         scene.add(wire); binWireframes.set(bin.id, wire); boxGeo.dispose();
       }
 
-      const config: BinConfig = {
-        w: bin.w, d: bin.d, h: bin.h,
-        cornerRadius: bin.cornerRadius, wallThickness: bin.wallThickness,
-        bottomThickness: bin.bottomThickness, magnets: bin.magnets, screws: bin.screws,
-        magnetDiameter: bin.magnetDiameter, magnetDepth: bin.magnetDepth,
-        stackingLip: bin.stackingLip,
-        labelShelf: bin.labelShelf, labelWidth: bin.labelWidth,
-        dividersX: bin.dividersX, dividersY: bin.dividersY,
-      };
-
-      requestBinMesh(bin.id, config, (result) => {
+      requestBinMesh(bin.id, binToConfig(bin), (result) => {
         const ctx2 = sceneRef.current;
         if (!ctx2) return;
 

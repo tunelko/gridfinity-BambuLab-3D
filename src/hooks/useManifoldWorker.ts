@@ -34,22 +34,42 @@ function configHash(config: BinConfig): string {
   return JSON.stringify(config);
 }
 
-// Cache: hash → mesh data
+// Cache: hash → mesh data. Bounded LRU — mesh buffers are large (hundreds of
+// KB each) and an unbounded map grows for every slider tick of every bin.
+const MESH_CACHE_MAX = 60;
 const meshCache = new Map<string, MeshResult>();
+
+function cacheGet(hash: string): MeshResult | undefined {
+  const hit = meshCache.get(hash);
+  if (hit) {
+    // Refresh recency (Map preserves insertion order)
+    meshCache.delete(hash);
+    meshCache.set(hash, hit);
+  }
+  return hit;
+}
+
+function cacheSet(hash: string, value: MeshResult) {
+  meshCache.set(hash, value);
+  if (meshCache.size > MESH_CACHE_MAX) {
+    const oldest = meshCache.keys().next().value as string;
+    meshCache.delete(oldest);
+  }
+}
 
 export function requestMesh(
   mode: 'preview' | 'export',
   config: BinConfig,
 ): Promise<MeshResult> {
   const hash = mode + ':' + configHash(config);
-  const cached = meshCache.get(hash);
+  const cached = cacheGet(hash);
   if (cached) return Promise.resolve(cached);
 
   return new Promise((resolve, reject) => {
     const requestId = `req_${++idCounter}`;
     pending.set(requestId, {
       resolve: (result) => {
-        meshCache.set(hash, result);
+        cacheSet(hash, result);
         resolve(result);
       },
       reject,
@@ -68,7 +88,7 @@ export function requestBinMesh(
   onError?: ErrorCallback,
 ) {
   const hash = 'preview:' + configHash(config);
-  const cached = meshCache.get(hash);
+  const cached = cacheGet(hash);
   if (cached) {
     onMesh(cached);
     return;
@@ -83,7 +103,7 @@ export function requestBinMesh(
 
   pending.set(requestId, {
     resolve: (result) => {
-      meshCache.set(hash, result);
+      cacheSet(hash, result);
       activeBinRequests.delete(binId);
       onMesh(result);
     },
