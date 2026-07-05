@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuid } from 'uuid';
+import { GF } from '../gridfinity/constants';
 
 export interface Bin {
   id: string;
@@ -99,10 +100,65 @@ const DEFAULT_DRAG: DragState = {
 
 const BIN_COLORS = ['#00d4aa', '#4488ff', '#ff6644', '#ffaa00', '#aa44ff', '#ff44aa'];
 
+/** Undo snapshots are deep clones of all bins — keep memory bounded. */
+const MAX_HISTORY = 100;
+
 function pushHistory(state: AppState): { history: Bin[][]; historyIndex: number } {
-  const newHistory = state.history.slice(0, state.historyIndex + 1);
+  let newHistory = state.history.slice(0, state.historyIndex + 1);
   newHistory.push(JSON.parse(JSON.stringify(state.bins)));
+  if (newHistory.length > MAX_HISTORY) {
+    newHistory = newHistory.slice(newHistory.length - MAX_HISTORY);
+  }
   return { history: newHistory, historyIndex: newHistory.length - 1 };
+}
+
+// ── Default-bin factories ────────────────────────────────────────────────────
+// Single source for new-bin defaults; was copy-pasted in 5 call sites (and
+// most of them silently dropped the preset's stackingLip).
+
+export function createDefaultBin(
+  overrides: Partial<Omit<Bin, 'id' | 'x' | 'y'>> = {},
+): Omit<Bin, 'id' | 'x' | 'y'> {
+  return {
+    w: 1, d: 1, h: 3,
+    cornerRadius: GF.BIN_CORNER_RADIUS,
+    wallThickness: GF.WALL_THICKNESS,
+    bottomThickness: GF.BOTTOM_THICKNESS,
+    stackingLip: false,
+    labelShelf: false,
+    labelWidth: GF.LABEL_DEFAULT_WIDTH,
+    magnets: false,
+    screws: false,
+    dividersX: 0,
+    dividersY: 0,
+    color: '',
+    label: '',
+    group: '',
+    ...overrides,
+  };
+}
+
+export interface BinPresetLike {
+  name?: string; w?: number; d?: number; h?: number;
+  stackingLip?: boolean; labelShelf?: boolean;
+  magnets?: boolean; screws?: boolean;
+  dividersX?: number; dividersY?: number;
+}
+
+export function binFromPreset(preset?: BinPresetLike): Omit<Bin, 'id' | 'x' | 'y'> {
+  if (!preset) return createDefaultBin();
+  return createDefaultBin({
+    w: preset.w ?? 1,
+    d: preset.d ?? 1,
+    h: preset.h ?? 3,
+    stackingLip: preset.stackingLip ?? false,
+    labelShelf: preset.labelShelf ?? false,
+    magnets: preset.magnets ?? false,
+    screws: preset.screws ?? false,
+    dividersX: preset.dividersX ?? 0,
+    dividersY: preset.dividersY ?? 0,
+    label: preset.name ?? '',
+  });
 }
 
 export const useStore = create<AppState>()((set, get) => ({

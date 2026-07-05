@@ -510,6 +510,36 @@ export interface BinConfig {
   dividersY?: number;
 }
 
+/**
+ * Map a store bin (or any bin-shaped object) to the geometry config.
+ * Single source for the Bin→BinConfig field list — a missed field here used
+ * to silently drop features from preview/export (it happened to stackingLip).
+ */
+export function binToConfig(bin: {
+  w: number; d: number; h: number;
+  cornerRadius: number; wallThickness: number; bottomThickness: number;
+  magnets: boolean; magnetDiameter?: number; magnetDepth?: number;
+  screws: boolean; stackingLip: boolean;
+  labelShelf: boolean; labelWidth: number;
+  dividersX: number; dividersY: number;
+}): BinConfig {
+  return {
+    w: bin.w, d: bin.d, h: bin.h,
+    cornerRadius: bin.cornerRadius,
+    wallThickness: bin.wallThickness,
+    bottomThickness: bin.bottomThickness,
+    magnets: bin.magnets,
+    magnetDiameter: bin.magnetDiameter,
+    magnetDepth: bin.magnetDepth,
+    screws: bin.screws,
+    stackingLip: bin.stackingLip,
+    labelShelf: bin.labelShelf,
+    labelWidth: bin.labelWidth,
+    dividersX: bin.dividersX,
+    dividersY: bin.dividersY,
+  };
+}
+
 // ── Geometry generation ──────────────────────────────────────────────────────
 //
 // ONE generator for both the 3D preview and the 3MF export — what you see is

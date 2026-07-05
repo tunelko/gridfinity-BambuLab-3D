@@ -1,7 +1,7 @@
 import { useState, useEffect, memo } from 'react';
 import { useStore, type ViewMode, type RenderMode } from '../store/useStore';
 import { GF } from '../gridfinity/constants';
-import type { BinConfig } from '../gridfinity/binGeometry';
+import { binToConfig } from '../gridfinity/binGeometry';
 import { requestMesh } from '../hooks/useManifoldWorker';
 import { exportTo3MF, downloadBlob } from '../gridfinity/export3mf';
 
@@ -96,7 +96,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--accent)' }}>GRIDFINITY BUILDER</h3>
-        <p className="mb-4" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>v0.2.0</p>
+        <p className="mb-4" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>v{__APP_VERSION__}</p>
 
         <p className="leading-relaxed mb-3" style={{ fontSize: 13, color: 'var(--text-primary)' }}>
           Browser-based parametric CAD tool for designing, previewing, and exporting 3D-printable Gridfinity storage layouts.
@@ -229,20 +229,9 @@ export default function Toolbar() {
         const bin = binsToExport[i];
         setExportProgress(`Generating ${i + 1}/${binsToExport.length}...`);
 
-        const config: BinConfig = {
-          w: bin.w, d: bin.d, h: bin.h,
-          cornerRadius: bin.cornerRadius, wallThickness: bin.wallThickness,
-          bottomThickness: bin.bottomThickness,
-          magnets: bin.magnets, screws: bin.screws,
-          magnetDiameter: bin.magnetDiameter, magnetDepth: bin.magnetDepth,
-          stackingLip: bin.stackingLip,
-          labelShelf: bin.labelShelf, labelWidth: bin.labelWidth,
-          dividersX: bin.dividersX, dividersY: bin.dividersY,
-        };
-
         // Full-quality CSG runs in the worker — the UI stays responsive and
         // the progress label actually updates between bins.
-        const { positions, indices } = await requestMesh('export', config);
+        const { positions, indices } = await requestMesh('export', binToConfig(bin));
 
         // Copy before translating: the worker result is cached and shared;
         // baking positions in place would corrupt later exports.

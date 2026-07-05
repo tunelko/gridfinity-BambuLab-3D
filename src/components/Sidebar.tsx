@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useStore, type Bin } from '../store/useStore';
+import { useStore, createDefaultBin, binFromPreset, type Bin } from '../store/useStore';
 import { GF, GRID_PRESETS, BIN_PRESETS, BIN_GROUPS, LAYOUT_TEMPLATES, type LayoutTemplate } from '../gridfinity/constants';
 import { checkCollision } from '../utils/collision';
 import BinConfigurator from './BinConfigurator';
@@ -175,25 +175,7 @@ export default function Sidebar() {
   }
 
   function handleAddBin(preset?: typeof BIN_PRESETS[number]) {
-    const config: Omit<Bin, 'id' | 'x' | 'y'> = {
-      w: preset?.w ?? 1,
-      d: preset?.d ?? 1,
-      h: preset?.h ?? 3,
-      cornerRadius: GF.BIN_CORNER_RADIUS,
-      wallThickness: GF.WALL_THICKNESS,
-      bottomThickness: GF.BOTTOM_THICKNESS,
-      stackingLip: false,
-      labelShelf: preset?.labelShelf ?? false,
-      labelWidth: GF.LABEL_DEFAULT_WIDTH,
-      magnets: preset?.magnets ?? false,
-      screws: preset?.screws ?? false,
-      dividersX: preset?.dividersX ?? 0,
-      dividersY: preset?.dividersY ?? 0,
-      color: '',
-      label: preset?.name ?? '',
-      group: '',
-    };
-    startPlacing(config);
+    startPlacing(binFromPreset(preset));
   }
 
   function handleQuickAdd(preset?: typeof BIN_PRESETS[number]) {
@@ -202,23 +184,7 @@ export default function Sidebar() {
     for (let row = 0; row <= gridRows - d; row++) {
       for (let col = 0; col <= gridCols - w; col++) {
         if (!checkCollision(bins, { x: col, y: row, w, d }, null, gridCols, gridRows)) {
-          addBin({
-            x: col, y: row, w, d,
-            h: preset?.h ?? 3,
-            cornerRadius: GF.BIN_CORNER_RADIUS,
-            wallThickness: GF.WALL_THICKNESS,
-            bottomThickness: GF.BOTTOM_THICKNESS,
-            stackingLip: false,
-            labelShelf: preset?.labelShelf ?? false,
-            labelWidth: GF.LABEL_DEFAULT_WIDTH,
-            magnets: preset?.magnets ?? false,
-            screws: preset?.screws ?? false,
-            dividersX: preset?.dividersX ?? 0,
-            dividersY: preset?.dividersY ?? 0,
-            color: '',
-            label: preset?.name ?? '',
-            group: '',
-          });
+          addBin({ x: col, y: row, ...binFromPreset(preset) });
           return;
         }
       }
@@ -263,17 +229,7 @@ export default function Sidebar() {
       for (let col = 0; col <= gridCols - w; col++) {
         const currentBins = useStore.getState().bins;
         if (!checkCollision(currentBins, { x: col, y: row, w, d }, null, gridCols, gridRows)) {
-          addBin({
-            x: col, y: row, w, d, h,
-            cornerRadius: GF.BIN_CORNER_RADIUS,
-            wallThickness: GF.WALL_THICKNESS,
-            bottomThickness: GF.BOTTOM_THICKNESS,
-            stackingLip: false, labelShelf: false, labelWidth: GF.LABEL_DEFAULT_WIDTH,
-            magnets: false, screws: false,
-            dividersX: 0, dividersY: 0,
-            color: '', label: '',
-            group: '',
-          });
+          addBin({ x: col, y: row, ...createDefaultBin({ w, d, h }) });
           placed++;
         }
       }
@@ -477,14 +433,12 @@ export default function Sidebar() {
     setGridSize(template.gridCols, template.gridRows);
     for (const b of template.bins) {
       addBin({
-        x: b.x, y: b.y, w: b.w, d: b.d, h: b.h,
-        cornerRadius: GF.BIN_CORNER_RADIUS,
-        wallThickness: GF.WALL_THICKNESS,
-        bottomThickness: GF.BOTTOM_THICKNESS,
-        stackingLip: false, labelShelf: false, labelWidth: GF.LABEL_DEFAULT_WIDTH,
-        magnets: false, screws: false,
-        dividersX: b.dividersX, dividersY: b.dividersY,
-        color: '', label: b.label, group: b.group || '',
+        x: b.x, y: b.y,
+        ...createDefaultBin({
+          w: b.w, d: b.d, h: b.h,
+          dividersX: b.dividersX, dividersY: b.dividersY,
+          label: b.label, group: b.group || '',
+        }),
       });
     }
     setShowTemplates(false);
@@ -1568,7 +1522,7 @@ export default function Sidebar() {
           <a href="https://gridfinity.xyz" target="_blank" rel="noopener" style={{ color: 'var(--accent)' }}>gridfinity.xyz</a>
         </p>
         <p style={{ fontSize: 10, marginTop: 4, color: 'var(--border)' }}>
-          v1.0.0 &middot; Manifold &middot; Three.js &middot; React
+          v{__APP_VERSION__} &middot; Manifold &middot; Three.js &middot; React
         </p>
       </div>
     </nav>

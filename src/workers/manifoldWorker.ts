@@ -31,9 +31,6 @@ function extractMesh(manifoldObj: any): { positions: Float32Array; indices: Uint
 }
 
 self.onmessage = async (e: MessageEvent) => {
-  // Verify origin — only accept messages from same origin (Web Worker security)
-  if (e.origin && e.origin !== '' && e.origin !== self.location?.origin) return;
-
   const { type, config, requestId } = e.data as {
     type: 'preview' | 'export';
     config: BinConfig;
