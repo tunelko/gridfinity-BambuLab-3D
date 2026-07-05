@@ -1,4 +1,5 @@
-FROM node:20-alpine
+# ── Build stage ──────────────────────────────────────────────────────────────
+FROM node:24-alpine AS build
 
 WORKDIR /docs
 
@@ -6,7 +7,12 @@ COPY package.json ./
 RUN npm install
 
 COPY . .
+RUN npx vitepress build
 
-EXPOSE 4173
+# ── Serve stage: static files only ───────────────────────────────────────────
+FROM nginx:1.27-alpine
 
-CMD ["npx", "vitepress", "dev", "--host", "0.0.0.0", "--port", "4173"]
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /docs/.vitepress/dist /usr/share/nginx/html
+
+EXPOSE 80
