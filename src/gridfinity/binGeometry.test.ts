@@ -12,8 +12,6 @@ beforeAll(async () => {
   wasm.setup();
 }, 60_000);
 
-const EPS = 0.01;
-
 function baseConfig(overrides: Partial<BinConfig> = {}): BinConfig {
   return {
     w: 1, d: 1, h: 3,
