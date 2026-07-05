@@ -31,11 +31,20 @@ function extractMesh(manifoldObj: any): { positions: Float32Array; indices: Uint
 }
 
 self.onmessage = async (e: MessageEvent) => {
-  const { type, config, requestId } = e.data as {
-    type: 'preview' | 'export';
-    config: BinConfig;
-    requestId: string;
+  // Origin check (CodeQL js/missing-origin-check): dedicated workers only
+  // receive messages from the page that spawned them (e.origin is ""), so
+  // reject anything claiming a foreign origin, then validate the message
+  // shape before acting on it.
+  if (e.origin && e.origin !== self.location.origin) return;
+
+  const { type, config, requestId } = (e.data ?? {}) as {
+    type?: unknown;
+    config?: BinConfig;
+    requestId?: unknown;
   };
+  if ((type !== 'preview' && type !== 'export') || typeof requestId !== 'string' || !config) {
+    return;
+  }
 
   try {
     const m = await ensureWasm();
