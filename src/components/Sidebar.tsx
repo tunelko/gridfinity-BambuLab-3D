@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useStore, createDefaultBin, binFromPreset, type Bin } from '../store/useStore';
 import { GF, GRID_PRESETS, BIN_PRESETS, BIN_GROUPS, LAYOUT_TEMPLATES, type LayoutTemplate } from '../gridfinity/constants';
+import { binTotalHeight } from '../gridfinity/spec';
 import { checkCollision } from '../utils/collision';
 import BinConfigurator from './BinConfigurator';
 import { resetOnboarding } from './OnboardingOverlay';
@@ -324,7 +325,7 @@ export default function Sidebar() {
     const labels = bins.map((b) => {
       const wMM = b.w * GF.CELL_SIZE - GF.TOLERANCE;
       const dMM = b.d * GF.CELL_SIZE - GF.TOLERANCE;
-      const hMM = b.h * GF.HEIGHT_UNIT;
+      const hMM = binTotalHeight(b);
       return `
         <div style="border:1px solid #333;border-radius:6px;padding:10px 14px;display:inline-block;margin:4px;min-width:140px;font-family:monospace;font-size:12px;page-break-inside:avoid;">
           <div style="font-size:14px;font-weight:bold;margin-bottom:4px;">${b.label || 'Bin'}</div>

@@ -1,6 +1,7 @@
 import { useRef, useCallback, memo } from 'react';
 import { useStore, type Bin } from '../store/useStore';
 import { GF, BIN_GROUPS } from '../gridfinity/constants';
+import { binTotalHeight } from '../gridfinity/spec';
 
 interface Props {
   bin: Bin;
@@ -20,7 +21,7 @@ export default memo(function BinConfigurator({ bin }: Props) {
 
   const outerW = bin.w * GF.CELL_SIZE - GF.TOLERANCE;
   const outerD = bin.d * GF.CELL_SIZE - GF.TOLERANCE;
-  const totalH = bin.h * GF.HEIGHT_UNIT;
+  const totalH = binTotalHeight(bin);
 
   return (
     <div className="animate-slide-up" style={{ padding: 16, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -71,6 +72,9 @@ export default memo(function BinConfigurator({ bin }: Props) {
           ariaLabel="Corner radius"
         />
       </Field>
+      <p style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 8 }}>
+        Body corners only. Feet and stacking sockets keep their Gridfinity profile.
+      </p>
       <div className="flex" style={{ gap: 10 }}>
         <Field label="Wall (mm)">
           <input

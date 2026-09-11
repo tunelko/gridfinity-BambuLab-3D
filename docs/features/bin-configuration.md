@@ -18,7 +18,7 @@ Click any bin on the 2D grid or in the sidebar list to select it and open the co
 
 | Parameter | Range | Default | Description |
 |-----------|-------|---------|-------------|
-| Corner radius | 0–3.75 mm | 3.75 mm | 0 = sharp corners |
+| Corner radius | 0–3.75 mm | 3.75 mm | Body only; feet and sockets retain fixed mating radii |
 | Wall thickness | 0.4–3.0 mm | 1.2 mm | Outer wall thickness |
 | Bottom thickness | 0.4–3.0 mm | 0.8 mm | Floor thickness |
 
@@ -26,9 +26,9 @@ Click any bin on the 2D grid or in the sidebar list to select it and open the co
 
 | Feature | Description |
 |---------|-------------|
-| **Stacking lip** | +4.4mm rim that mirrors the baseplate socket, allowing bins to stack |
+| **Stacking lip** | +3.8mm printed rim with its own female mating profile |
 | **Label shelf** | 45-degree angled shelf on the front wall for label strips |
-| **Label width** | Width of the label shelf (configurable) |
+| **Label width** | Requested shelf width; limited by cavity height to protect the floor and feet on shallow bins |
 | **Magnets** | 6mm diameter holes at corners for magnet retention (4 per cell unit) |
 | **Screws** | M3 clearance holes at corners for screw retention (4 per cell unit) |
 | **Dividers X** | Vertical dividers (0–9), equispaced wall-to-wall |
@@ -47,6 +47,7 @@ Click any bin on the 2D grid or in the sidebar list to select it and open the co
 The configurator shows computed real-world dimensions:
 
 - **Outer size**: `W × 42mm - 0.5mm tolerance` per axis
-- **Total height**: `H × 7mm + 4.75mm base`
+- **Total height**: `H × 7mm + (stacking lip ? 3.8mm : 0)`; the base is included
 
-For example, a 2x2x3u bin measures **83.5 × 83.5 × 25.75 mm**.
+For example, a 2x2x3u bin measures **83.5 × 83.5 × 21.0mm**, or **24.8mm high**
+with a stacking lip. Check the [fit test](../guide/fit-test.md) before a full print.

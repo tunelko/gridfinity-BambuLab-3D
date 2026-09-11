@@ -12,7 +12,7 @@ Gridfinity Builder exports bins in the [3MF format](https://3mf.io/), an industr
 
 For each bin, the full export geometry is generated with:
 
-- Complete 5-layer Z-profile base
+- Exact lower chamfer, straight band, and upper chamfer of the mating foot
 - All features (magnets, screws, dividers, lip, label shelf)
 - Watertight boolean operations via Manifold CSG
 
@@ -21,9 +21,11 @@ For each bin, the full export geometry is generated with:
 Each bin's vertices are offset by its grid position:
 
 ```
-vertex.x += bin.x × 42mm
-vertex.y += bin.y × 42mm
+vertex.x += (bin.x + bin.w / 2) × 42mm - gridCols × 42mm / 2
+vertex.y += (bin.y + bin.d / 2) × 42mm - gridRows × 42mm / 2
 ```
+
+The bin's lowest Z stays at zero. Fit Test uses its own non-overlapping three-object placement so the bins and baseplate can be printed together, not assembled on the print bed.
 
 ### 3. Serialize to XML
 
@@ -31,7 +33,7 @@ The exporter creates the 3MF XML structure:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<model xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+<model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
   <resources>
     <object id="1" type="model">
       <mesh>
@@ -69,4 +71,4 @@ The ZIP blob is offered as a browser download.
 
 ## Bambu Studio Compatibility
 
-The exporter includes BambuStudio-specific metadata to ensure full compatibility with Bambu Lab's slicer. Exported files open directly with all bins positioned on the virtual build plate.
+The exporter includes BambuStudio-specific metadata for object placement. Automated tests open the ZIP, read the XML, and reconstruct the mesh objects to check dimensions and fit after serialization. This does not certify behavior in every slicer version. Import at 100% scale and check the dimensions before printing; see [Print a Fit Test](/guide/fit-test).

@@ -3,6 +3,7 @@ import { useStore, binFromPreset } from '../store/useStore';
 import { CELL_PX, screenToGrid } from '../utils/gridMath';
 import { checkCollision } from '../utils/collision';
 import { GF, BIN_GROUPS } from '../gridfinity/constants';
+import { binTotalHeight } from '../gridfinity/spec';
 
 const DRAG_THRESHOLD = 5; // px movement to start drag
 const HANDLE_SIZE = 8;    // px size of resize handles
@@ -1262,7 +1263,7 @@ export default function GridCanvas2D() {
           const bh = hoveredBin.d * cellSize;
           const wMM = (hoveredBin.w * GF.CELL_SIZE - GF.TOLERANCE).toFixed(1);
           const dMM = (hoveredBin.d * GF.CELL_SIZE - GF.TOLERANCE).toFixed(1);
-          const hMM = (hoveredBin.h * GF.HEIGHT_UNIT).toFixed(1);
+          const hMM = binTotalHeight(hoveredBin).toFixed(1);
 
           return (
             <g pointerEvents="none">
@@ -1319,7 +1320,7 @@ export default function GridCanvas2D() {
           const bh = bin.d * cellSize;
           const wMM = (bin.w * GF.CELL_SIZE - GF.TOLERANCE).toFixed(1);
           const dMM = (bin.d * GF.CELL_SIZE - GF.TOLERANCE).toFixed(1);
-          const hMM = (bin.h * GF.HEIGHT_UNIT).toFixed(1);
+          const hMM = binTotalHeight(bin).toFixed(1);
 
           return (
             <g pointerEvents="none">

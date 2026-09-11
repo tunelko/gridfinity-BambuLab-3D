@@ -1,33 +1,18 @@
 import Module from 'manifold-3d';
 import type { ManifoldToplevel } from 'manifold-3d';
 import { generateBinPreview, generateBinExport, type BinConfig } from '../gridfinity/binGeometry';
+import { generateBaseplate } from '../gridfinity/baseplateGeometry';
+import { extractMesh } from '../gridfinity/meshData';
 
-let wasm: ManifoldToplevel | null = null;
+let wasm: Promise<ManifoldToplevel> | null = null;
 
 async function ensureWasm(): Promise<ManifoldToplevel> {
   if (wasm) return wasm;
-  const m = await Module();
-  m.setup();
-  wasm = m;
-  return m;
-}
-
-function extractMesh(manifoldObj: any): { positions: Float32Array; indices: Uint32Array } {
-  const mesh = manifoldObj.getMesh();
-  const numVert: number = mesh.numVert;
-  const numProp: number = mesh.numProp;
-  const vertProps: Float32Array = mesh.vertProperties;
-  const triVerts: Uint32Array = mesh.triVerts;
-
-  const positions = new Float32Array(numVert * 3);
-  for (let i = 0; i < numVert; i++) {
-    const offset = i * numProp;
-    positions[i * 3] = vertProps[offset];
-    positions[i * 3 + 1] = vertProps[offset + 1];
-    positions[i * 3 + 2] = vertProps[offset + 2];
-  }
-
-  return { positions, indices: new Uint32Array(triVerts) };
+  wasm = Module().then(m => { m.setup(); return m; }).catch(err => {
+    wasm = null;
+    throw err;
+  });
+  return wasm;
 }
 
 self.onmessage = async (e: MessageEvent) => {
@@ -42,24 +27,26 @@ self.onmessage = async (e: MessageEvent) => {
     config?: BinConfig;
     requestId?: unknown;
   };
-  if ((type !== 'preview' && type !== 'export') || typeof requestId !== 'string' || !config) {
+  if ((type !== 'preview' && type !== 'export' && type !== 'baseplate') || typeof requestId !== 'string' || !config) {
     return;
   }
 
   try {
     const m = await ensureWasm();
 
-    const manifold = type === 'export'
+    const manifold = type === 'baseplate'
+      ? generateBaseplate(m, config.w, config.d)
+      : type === 'export'
       ? generateBinExport(m, config)
       : generateBinPreview(m, config);
 
-    const { positions, indices } = extractMesh(manifold);
-    manifold.delete();
-
-    (self as any).postMessage(
-      { type: 'mesh', requestId, positions, indices },
-      [positions.buffer, indices.buffer],
-    );
+    try {
+      const { positions, indices } = extractMesh(manifold);
+      (self as any).postMessage(
+        { type: 'mesh', requestId, positions, indices },
+        [positions.buffer, indices.buffer],
+      );
+    } finally { manifold.delete(); }
   } catch (err) {
     (self as any).postMessage({
       type: 'error',

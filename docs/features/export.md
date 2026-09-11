@@ -15,25 +15,29 @@ Export your designs as industry-standard 3MF files, ready for slicing and 3D pri
 |--------|-------------|
 | **Export Single** | Exports only the currently selected bin |
 | **Export All** | Exports all bins as a multi-object 3MF with correct grid positions |
+| **Fit Test** | Two small stackable bins and a 2×1 baseplate; works with an empty layout |
 
 ## Slicer Compatibility
 
 ![Bambu Studio](/images/bambulabA1.png)
 
-Exported 3MF files are tested with:
+The exporter includes metadata intended for:
 
-- **Bambu Studio** — Full compatibility with BambuStudio-specific metadata
-- **PrusaSlicer** — Opens and slices correctly
-- **Cura** — Standard 3MF support
+- **Bambu Studio** — BambuStudio-specific metadata
+- **PrusaSlicer** and **Cura** — Standard 3MF mesh import
+
+Automated validation reconstructs the meshes from the generated ZIP/XML. It does
+not launch these slicers. Verify the imported dimensions and print the
+[fit test](../guide/fit-test.md) with your slicer and material.
 
 ## Technical Details
 
 ### Manifold CSG
 
-All geometry is generated using the [Manifold](https://github.com/elalish/manifold) WASM CSG engine, which guarantees:
+Geometry is generated using the [Manifold](https://github.com/elalish/manifold) WASM CSG engine:
 
-- **Watertight meshes** — No holes or self-intersections
-- **Boolean correctness** — Subtraction operations (cavities, holes) are mathematically exact
+- **Closed meshes** — Nonempty, valid solids are required before extracting mesh buffers
+- **Boolean operations** — Cavities, holes and features are combined in the CAD model
 - **Performance** — CSG runs in a Web Worker to keep the UI responsive
 
 ### 3MF Format
@@ -41,7 +45,7 @@ All geometry is generated using the [Manifold](https://github.com/elalish/manifo
 The 3MF format is a ZIP archive (OPC package) containing XML mesh data:
 
 1. Vertices and triangles extracted from Manifold meshes
-2. Coordinate system conversion (Manifold Z-up to 3MF Y-up)
+2. Preserve Z-up coordinates in millimeters (Y/Z conversion is only for the preview)
 3. Serialized to 3MF XML with proper namespaces
 4. Packaged with JSZip as a valid OPC archive
 

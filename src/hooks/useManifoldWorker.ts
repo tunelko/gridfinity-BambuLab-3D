@@ -30,7 +30,7 @@ function getWorker(): Worker {
   return worker;
 }
 
-function configHash(config: BinConfig): string {
+function configHash(config: BinConfig | { w: number; d: number }): string {
   return JSON.stringify(config);
 }
 
@@ -57,9 +57,11 @@ function cacheSet(hash: string, value: MeshResult) {
   }
 }
 
+export function requestMesh(mode: 'baseplate', config: { w: number; d: number }): Promise<MeshResult>;
+export function requestMesh(mode: 'preview' | 'export', config: BinConfig): Promise<MeshResult>;
 export function requestMesh(
-  mode: 'preview' | 'export',
-  config: BinConfig,
+  mode: 'preview' | 'export' | 'baseplate',
+  config: BinConfig | { w: number; d: number },
 ): Promise<MeshResult> {
   const hash = mode + ':' + configHash(config);
   const cached = cacheGet(hash);
@@ -87,16 +89,17 @@ export function requestBinMesh(
   onMesh: Callback,
   onError?: ErrorCallback,
 ) {
+  // Cancel before checking cache: an older in-flight mesh must not overwrite
+  // a newly selected cached configuration.
+  const prev = activeBinRequests.get(binId);
+  if (prev) pending.delete(prev);
+  activeBinRequests.delete(binId);
   const hash = 'preview:' + configHash(config);
   const cached = cacheGet(hash);
   if (cached) {
     onMesh(cached);
     return;
   }
-
-  // Cancel previous request for this bin
-  const prev = activeBinRequests.get(binId);
-  if (prev) pending.delete(prev);
 
   const requestId = `req_${++idCounter}`;
   activeBinRequests.set(binId, requestId);

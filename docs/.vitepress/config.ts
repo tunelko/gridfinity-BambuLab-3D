@@ -31,6 +31,7 @@ export default defineConfig({
         items: [
           { text: 'What is Gridfinity Builder?', link: '/guide/what-is-gridfinity-builder' },
           { text: 'Getting Started', link: '/guide/getting-started' },
+          { text: 'Print a Fit Test', link: '/guide/fit-test' },
           { text: 'Docker Setup', link: '/guide/docker' },
         ],
       },

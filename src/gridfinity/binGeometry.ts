@@ -1,6 +1,7 @@
 import type { ManifoldToplevel } from 'manifold-3d';
 import { GF } from './constants';
-import { SPEC } from './spec';
+import { FOOT_PROFILE, LIP_SOCKET_PROFILE, PRINTED_LIP_HEIGHT, SPEC } from './spec';
+import { profileSolid } from './profiles';
 
 // Curve tessellation — set per generation by quality ('preview' uses fewer
 // segments for fast interactive CSG; 'export' full quality for printing).
@@ -101,7 +102,7 @@ function specHoleOffset(holeRadius: number): number {
 
 /**
  * Hole positions: a 26×26mm square centered in each cell of the bin
- * (official magnet grid).
+ * (standard magnet grid).
  */
 function cellHolePositions(
   unitsW: number, unitsD: number, holeOffset: number,
@@ -179,12 +180,13 @@ function createScrewHoles(
 function createLabelShelf(
   wasm: ManifoldToplevel,
   outerW: number, outerD: number,
-  _bodyStartZ: number, bodyTopZ: number,
+  cavityStartZ: number, bodyTopZ: number,
   wall: number, shelfWidth: number, _r: number,
 ): any {
   const innerW = outerW - 2 * wall;
-  const shelfDepth = Math.min(shelfWidth, outerD / 2);
   const angleRad = (GF.LABEL_ANGLE * Math.PI) / 180;
+  // A wide label on a shallow bin must not cut its floor or mating foot.
+  const shelfDepth = Math.min(shelfWidth, outerD / 2, (bodyTopZ - cavityStartZ) / Math.tan(angleRad));
   const shelfH = shelfDepth * Math.tan(angleRad); // at 45°, shelfH ≈ shelfDepth
 
   const eps = 0.5; // overshoot for clean boolean
@@ -288,90 +290,30 @@ function createHollowBody(
 
 // ── Stacking Lip ─────────────────────────────────────────────────────────────
 //
-// Official Gridfinity stacking lip: a perimeter PROTRUSION above the top rim
-// whose inner surface is the negative of the foot profile, so the feet of an
-// identical bin dropped on top self-center on the 45° seat and nest ~4.05mm
-// deep (the foot bottom rests 0.35mm above the rim).
-//
-// Inner-face insets from the bin outline (rim at z=R, lip total 4.4mm):
-//
-//   z R+4.40  inset 0.70   ← mouth (widest opening, guides the foot in)
-//      ↓ 45° seat chamfer — full-face contact with the foot's 2.15 chamfer
-//   z R+2.95  inset 2.15
-//      ↓ vertical, inset 1.90 (foot straight section 2.15 − 0.25 clearance)
-//   z R+0.00  inset 1.90
-//      ↓ 45° support chamfer merging into the wall (printable underside)
-//   z R−(1.90−wall)  inset wall
-//
-// Ring cross-sections are not convex, so the lip is built as an outline block
-// MINUS an inner negative assembled from convex hulls of rounded-rect discs
-// (same technique as the foot chamfers — corner radii shrink 1:1 with inset).
+// The female profile has its own dimensions and fixed mating corner radius.
+// Its lower lead-in widens upward; a separate underside supports thin walls.
+// Truncating the theoretical sharp tip preserves a printable 0.6mm crown.
 function createStackingLip(
   wasm: ManifoldToplevel,
   outerW: number, outerD: number,
   bodyTopZ: number,
-  r: number,
   wall: number,
 ): any {
-  const LIP_H = SPEC.LIP.HEIGHT;                        // 4.40
-  const seatBotInset = SPEC.FOOT.CHAMFER_TOP;           // 2.15
-  const wallInset = seatBotInset - SPEC.CLEARANCE;      // 1.90
-  // Seat bottom (rim-relative): foot chamfer start when seated 0.35 up.
-  const seatBotZ = SPEC.FOOT.CHAMFER_BOTTOM + SPEC.FOOT.STRAIGHT + 0.35; // 2.95
-  const supportH = Math.max(0, wallInset - wall);       // 0.70 @ 1.2mm wall
+  const r = SPEC.FOOT.CORNER_RADIUS;
+  const bottomInset = LIP_SOCKET_PROFILE[0][1];
+  const supportH = Math.max(0, bottomInset - wall);
   const eps = 0.01;
-  const overshoot = 0.15;
-
-  function disc(inset: number, zTop: number): any {
-    const d = roundedBox(
-      wasm, outerW - 2 * inset, outerD - 2 * inset, eps, Math.max(0, r - inset),
-    );
-    const pos = d.translate([0, 0, zTop - eps]);
-    d.delete();
-    return pos;
-  }
-
-  // Outline block spanning support chamfer + lip.
-  const block = roundedBox(wasm, outerW, outerD, supportH + LIP_H, r);
+  const block = roundedBox(wasm, outerW, outerD, supportH + PRINTED_LIP_HEIGHT, r);
   const blockPos = block.translate([0, 0, bodyTopZ - supportH]);
   block.delete();
-
-  const negatives: any[] = [];
-
-  // Support chamfer: inset wall @ (R − supportH) → inset 1.90 @ R.
-  // Cross-sections here NARROW upward, so the cone binds to the discs' TOP
-  // edges — place those at exact heights for a true 45°.
-  if (supportH > 0) {
-    const s0 = disc(wall, bodyTopZ - supportH);
-    const s1 = disc(wallInset, bodyTopZ);
-    negatives.push(wasm.Manifold.hull([s0, s1]));
-    s0.delete(); s1.delete();
-  }
-
-  // Vertical section: inset 1.90, z R → R+2.95.
-  const vPoly = createRoundedRectPolygon(
-    outerW - 2 * wallInset, outerD - 2 * wallInset, Math.max(0, r - wallInset),
+  const negative = profileSolid(
+    wasm, outerW, outerD, r,
+    [
+      [bodyTopZ - supportH - eps, Math.min(wall, bottomInset)],
+      ...LIP_SOCKET_PROFILE.map(([z, inset]) => [bodyTopZ + z, inset] as const),
+    ],
+    SEGMENTS_PER_CORNER,
   );
-  const vCs = new wasm.CrossSection(vPoly);
-  const vSolid = vCs.extrude(seatBotZ + eps);
-  vCs.delete();
-  const vPos = vSolid.translate([0, 0, bodyTopZ]);
-  vSolid.delete();
-  negatives.push(vPos);
-
-  // Seat chamfer: inset 2.15 @ R+2.95 → past the lip top for a clean cut
-  // (inset 0.70 at R+4.40, continuing the 45° slope). Cross-sections widen
-  // upward → cone binds to BOTTOM edges; both placed at exact heights so the
-  // seat plane is coplanar with the foot's 2.15 chamfer.
-  const c0 = disc(seatBotInset, bodyTopZ + seatBotZ + eps);
-  const c1 = disc(
-    seatBotInset - (LIP_H - seatBotZ) - overshoot,
-    bodyTopZ + LIP_H + overshoot + eps,
-  );
-  negatives.push(wasm.Manifold.hull([c0, c1]));
-  c0.delete(); c1.delete();
-
-  const negative = unionAll(wasm, negatives);
   const lip = blockPos.subtract(negative);
   blockPos.delete();
   negative.delete();
@@ -433,9 +375,9 @@ function applyFeatures(wasm: ManifoldToplevel, bin: any, config: BinConfig): any
   const cavityH = bodyH - bottom;
 
   // Stacking lip (protrusion added above the rim so identical bins nest)
-  if (config.stackingLip && cavityH > 0) {
+  if (config.stackingLip) {
     try {
-      const lip = createStackingLip(wasm, outerW, outerD, bodyTopZ, r, wall);
+      const lip = createStackingLip(wasm, outerW, outerD, bodyTopZ, wall);
       const after = result.add(lip);
       result.delete();
       lip.delete();
@@ -449,7 +391,7 @@ function applyFeatures(wasm: ManifoldToplevel, bin: any, config: BinConfig): any
   if (config.labelShelf && labelWidth > 0 && cavityH > 0) {
     try {
       const shelf = createLabelShelf(
-        wasm, outerW, outerD, bodyStartZ, bodyTopZ,
+        wasm, outerW, outerD, cavityStartZ, bodyTopZ,
         wall, labelWidth, r,
       );
       const after = result.subtract(shelf);
@@ -547,59 +489,20 @@ export function binToConfig(bin: {
 //   'preview' → coarser corners/cylinders for fast interactive CSG
 //   'export'  → full resolution for printing
 
-// Official Gridfinity foot Z-profile per cell (cell = 41.5mm after tolerance),
+// Standard Gridfinity foot Z-profile per cell (cell = 41.5mm after tolerance),
 // values from SPEC.FOOT — see spec.ts. Bottom → top:
 //   z 0.00→0.80  45° chamfer  35.60 → 37.20
 //   z 0.80→2.60  vertical     37.20
 //   z 2.60→4.75  45° chamfer  37.20 → 41.50   (meets the bin body flush)
 //
-// Chamfers are built as convex hulls of two thin rounded-rect discs so the
-// corner radius shrinks 1:1 with the inset (true 45° offset surface). A scaled
+// Chamfers join exact rounded-rectangle rings so the corner radius shrinks
+// 1:1 with the inset (true 45° offset surface). A scaled
 // extrude would shrink corners proportionally instead, leaving foot corners
 // too square to enter a baseplate socket.
 function createExportCellBase(wasm: ManifoldToplevel): any {
   const cellSize = GF.CELL_SIZE - GF.TOLERANCE;
-  const { CHAMFER_BOTTOM, STRAIGHT, CHAMFER_TOP, HEIGHT, CORNER_RADIUS } = SPEC.FOOT;
-  const insetLow = CHAMFER_BOTTOM + CHAMFER_TOP; // 2.95 → width 35.60
-  const insetMid = CHAMFER_TOP;                  // 2.15 → width 37.20
-  const eps = 0.01;
-
-  // Thin disc of the foot cross-section at a given inset, top face at z.
-  function disc(inset: number, zTop: number): any {
-    const w = cellSize - 2 * inset;
-    const d = roundedBox(wasm, w, w, eps, Math.max(0, CORNER_RADIUS - inset));
-    const pos = d.translate([0, 0, zTop - eps]);
-    d.delete();
-    return pos;
-  }
-
-  // Bottom chamfer: 35.60 @ z0 → 37.20 @ z0.80.
-  // Disc Z placement: the hull cone binds to each disc's BOTTOM edge here
-  // (cross-sections widen upward), so both bottom edges sit at exact heights
-  // to keep the cone at exactly 45° — the mating faces must be coplanar.
-  const b0 = disc(insetLow, eps);
-  const b1 = disc(insetMid, CHAMFER_BOTTOM + eps);
-  const bottomChamfer = wasm.Manifold.hull([b0, b1]);
-  b0.delete(); b1.delete();
-
-  // Vertical section: 37.20, z 0.80→2.60
-  const midPoly = createRoundedRectPolygon(
-    cellSize - 2 * insetMid, cellSize - 2 * insetMid, CORNER_RADIUS - insetMid,
-  );
-  const midCs = new wasm.CrossSection(midPoly);
-  const midSolid = midCs.extrude(STRAIGHT);
-  midCs.delete();
-  const straight = midSolid.translate([0, 0, CHAMFER_BOTTOM]);
-  midSolid.delete();
-
-  // Top chamfer: 37.20 @ z2.60 → 41.50 @ z4.75 (bottom edges exact, as above;
-  // t1 overshoots 0.01 into the body, which the union absorbs)
-  const t0 = disc(insetMid, CHAMFER_BOTTOM + STRAIGHT + eps);
-  const t1 = disc(0, HEIGHT + eps);
-  const topChamfer = wasm.Manifold.hull([t0, t1]);
-  t0.delete(); t1.delete();
-
-  return unionAll(wasm, [bottomChamfer, straight, topChamfer]);
+  return profileSolid(wasm, cellSize, cellSize, SPEC.FOOT.CORNER_RADIUS,
+    [...FOOT_PROFILE, [SPEC.FOOT.HEIGHT + 0.01, 0]], SEGMENTS_PER_CORNER);
 }
 
 function createExportCellBases(wasm: ManifoldToplevel, unitsW: number, unitsD: number): any {
@@ -635,7 +538,7 @@ export function generateBin(
 
   const r = Math.min(config.cornerRadius, outerW / 2, outerD / 2);
 
-  // 1. Per-cell official foot profile (reaches full 41.5mm width at z=4.75,
+  // 1. Per-cell standard foot profile (reaches full 41.5mm width at z=4.75,
   //    so the body bottom face seals the base; the 0.5mm V-grooves between
   //    feet of multi-cell bins stay open underneath, per spec)
   const base = createExportCellBases(wasm, config.w, config.d);

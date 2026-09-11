@@ -3,8 +3,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { useStore, type Bin } from '../store/useStore';
 import { GF } from '../gridfinity/constants';
-import { requestBinMesh, clearMeshCache } from '../hooks/useManifoldWorker';
+import { requestBinMesh, requestMesh, clearMeshCache } from '../hooks/useManifoldWorker';
 import { binToConfig } from '../gridfinity/binGeometry';
+import { binTotalHeight, SPEC } from '../gridfinity/spec';
 
 // ── Smooth camera animation ──
 function animateCamera(
@@ -34,7 +35,7 @@ function animateCamera(
 function binWorldCenter(bin: Bin, gridCols: number, gridRows: number) {
   const cx = (bin.x + bin.w / 2) * GF.CELL_SIZE - (gridCols * GF.CELL_SIZE) / 2;
   const cz = (bin.y + bin.d / 2) * GF.CELL_SIZE - (gridRows * GF.CELL_SIZE) / 2;
-  const h = bin.h * GF.HEIGHT_UNIT;
+  const h = binTotalHeight(bin);
   return { cx, cz, h };
 }
 
@@ -134,7 +135,7 @@ export default function Viewport3D() {
     const groundMat = new THREE.ShadowMaterial({ opacity: 0.3 });
     const groundShadow = new THREE.Mesh(groundGeo, groundMat);
     groundShadow.receiveShadow = true;
-    groundShadow.position.y = -0.05;
+    groundShadow.position.y = -SPEC.BASEPLATE.FLOOR_CLEARANCE - 0.05;
     scene.add(groundShadow);
 
     const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -351,7 +352,7 @@ export default function Viewport3D() {
     bins.forEach((bin) => {
       const outerW = bin.w * GF.CELL_SIZE - GF.TOLERANCE;
       const outerD = bin.d * GF.CELL_SIZE - GF.TOLERANCE;
-      const binTotalH = bin.h * GF.HEIGHT_UNIT;
+      const binTotalH = binTotalHeight(bin);
       const cx = (bin.x + bin.w / 2) * GF.CELL_SIZE - (gridCols * GF.CELL_SIZE) / 2;
       const cz = (bin.y + bin.d / 2) * GF.CELL_SIZE - (gridRows * GF.CELL_SIZE) / 2;
 
@@ -450,12 +451,34 @@ export default function Viewport3D() {
       (ctx.baseplateMesh.material as THREE.Material).dispose(); ctx.baseplateMesh = null;
     }
     if (showBaseplate) {
-      const bpW = gridCols * GF.CELL_SIZE, bpD = gridRows * GF.CELL_SIZE, bpH = GF.BASEPLATE_HEIGHT;
-      const geo = new THREE.BoxGeometry(bpW, bpH, bpD);
-      const mat = new THREE.MeshStandardMaterial({ color: '#333340', roughness: 0.8, metalness: 0.05, transparent: true, opacity: 0.3 });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(0, -bpH / 2, 0); mesh.receiveShadow = true;
-      ctx.scene.add(mesh); ctx.baseplateMesh = mesh;
+      let cancelled = false;
+      requestMesh('baseplate', { w: gridCols, d: gridRows }).then(({ positions, indices }) => {
+        if (cancelled || sceneRef.current !== ctx) return;
+        const pos = new Float32Array(positions);
+        const idx = new Uint32Array(indices);
+        for (let i = 0; i < pos.length; i += 3) {
+          [pos[i + 1], pos[i + 2]] = [pos[i + 2], pos[i + 1]];
+        }
+        for (let i = 0; i < idx.length; i += 3) {
+          [idx[i + 1], idx[i + 2]] = [idx[i + 2], idx[i + 1]];
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geo.setIndex(new THREE.BufferAttribute(idx, 1));
+        geo.computeVertexNormals();
+        const mat = new THREE.MeshStandardMaterial({ color: '#62627a', roughness: 0.8, metalness: 0.05, transparent: true, opacity: 0.7 });
+        // The socket mesh can arrive after the section-view effect has run.
+        const current = useStore.getState();
+        if (current.sectionView && current.bins.length > 0) mat.clippingPlanes = [ctx.clipPlane];
+        const mesh = new THREE.Mesh(geo, mat);
+        // Align the socket datum with the bins' Z=0, including bottom relief.
+        mesh.position.y = -SPEC.BASEPLATE.FLOOR_CLEARANCE;
+        mesh.receiveShadow = true;
+        ctx.scene.add(mesh); ctx.baseplateMesh = mesh;
+      }).catch(err => {
+        if (!cancelled) console.warn('Baseplate preview failed:', err);
+      });
+      return () => { cancelled = true; };
     }
   }, [showBaseplate, gridCols, gridRows]);
 

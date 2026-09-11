@@ -1,8 +1,8 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import Module from 'manifold-3d';
 import type { ManifoldToplevel } from 'manifold-3d';
 import { GF } from './constants';
-import { SPEC } from './spec';
+import { binTotalHeight } from './spec';
 import { generateBinExport, generateBinPreview, type BinConfig } from './binGeometry';
 
 let wasm: ManifoldToplevel;
@@ -62,6 +62,7 @@ describe('official foot Z-profile', () => {
   beforeAll(() => {
     bin = generateBinExport(wasm, baseConfig());
   });
+  afterAll(() => bin.delete());
 
   function widthAt(z: number): number {
     const cs = bin.slice(z);
@@ -158,17 +159,18 @@ describe('magnet holes on the official 26mm grid', () => {
 
 // ── F2: stacking — two identical bins must physically mate ──────────────────
 //
-// Seated position: the foot's 2.15 top chamfer rests full-face on the lip's
-// 45° seat, leaving the foot bottom 0.35mm above the rim (rim = u×7).
+// Nominal mating position is rim = u×7. Gravity seats ideal default parts
+// 0.35mm lower; contact there is intentional, not a clearance failure.
 
 describe('stacking: two identical bins mate', () => {
   const config = baseConfig({ w: 2, d: 2, h: 3, stackingLip: true });
-  const seatZ = 3 * GF.HEIGHT_UNIT + 0.35;
+  const seatZ = 3 * GF.HEIGHT_UNIT - 0.35;
   let bottom: any;
 
   beforeAll(() => {
     bottom = generateBinExport(wasm, config);
   }, 120_000);
+  afterAll(() => bottom.delete());
 
   function overlapAt(dx: number, dy: number, dz: number): number {
     const top = bottom.translate([dx, dy, dz]);
@@ -220,9 +222,8 @@ for (const generator of [generateBinExport, generateBinPreview] as const) {
           expect(bb.max[1] - bb.min[1]).toBeCloseTo(config.d * GF.CELL_SIZE - GF.TOLERANCE, 2);
           expect(bb.min[2]).toBeCloseTo(0, 2);
 
-          // Spec heights: total = u×7 (base included); the lip protrudes 4.4 above.
-          const expectedTop =
-            config.h * GF.HEIGHT_UNIT + (config.stackingLip ? SPEC.LIP.HEIGHT : 0);
+          // The theoretical sharp crown is trimmed for printability.
+          const expectedTop = binTotalHeight(config);
           expect(bb.max[2]).toBeCloseTo(expectedTop, 1);
 
           // The exact mesh buffers written to the 3MF must themselves be manifold

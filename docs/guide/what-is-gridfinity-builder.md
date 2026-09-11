@@ -10,7 +10,7 @@ Built for makers, 3D printing enthusiasts, and anyone who wants to organize thei
 
 - **No installation** — runs entirely in the browser (or install as PWA for offline use)
 - **Real-time 3D preview** — see your bins as you design them
-- **Accurate geometry** — follows the official Gridfinity specification with precise dimensions
+- **Mating geometry** — follows the community Gridfinity drawing, with dimensional tests and a printable [fit test](/guide/fit-test)
 - **Export to 3MF** — watertight meshes ready for Bambu Studio, PrusaSlicer, or Cura
 - **Fully client-side** — no server, no uploads, your data stays local
 

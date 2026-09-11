@@ -1,5 +1,10 @@
 node_modules
+**/node_modules
 dist
+**/dist
+**/.vitepress/cache
+artifacts
+.env*
 .git
 *.md
 !README.md

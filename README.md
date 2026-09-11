@@ -48,14 +48,14 @@ Transparent wireframe view for inspecting bin internals, base profiles, and stac
 
 ### Accurate Gridfinity Geometry
 
-All bins follow the official Gridfinity specification with precise dimensions.
+Mating geometry follows the community Gridfinity drawing, with independent dimensional and interference tests. Print the [fit test](docs/guide/fit-test.md) before committing to a large layout.
 
 - **Z-profile base** with stepped chamfers for baseplate interlocking
-- **Configurable corner radius** (0mm sharp to 3.75mm standard)
+- **Configurable body corner radius** (0mm sharp to 3.75mm standard; feet and sockets stay fixed)
 - **Wall & bottom thickness** control (default 1.2mm / 0.8mm)
-- **Stacking lip** (+4.4mm, mirrors baseplate socket profile)
-- **Label shelf** with configurable width and 45-degree angle
-- **Magnet holes** (6mm diameter, 4 per cell unit)
+- **Stacking lip** (+3.8mm printable height; theoretical 4.4mm tip trimmed by 0.6mm)
+- **Label shelf** with configurable width and 45-degree angle, limited to cavity depth to protect the floor and feet
+- **Magnet holes** (6.5mm holes for nominal 6mm magnets, 4 per cell unit)
 - **Screw holes** (M3, 4 per cell unit)
 - **Interior dividers** (up to 9 per axis, wall-to-wall)
 - **Multi-cell bins** with correct 42mm cell spacing
@@ -67,13 +67,14 @@ All bins follow the official Gridfinity specification with precise dimensions.
 Export your designs as industry-standard 3MF files, ready for PrusaSlicer, Cura, or Bambu Studio.
 
 - **Export single bin** or **all bins** as multi-object 3MF
+- **Fit Test** exports two matching 1x1 bins and a real 2x1 socket baseplate
 - **Manifold CSG** ensures watertight, printable meshes
 - **Web Worker** offloads heavy geometry generation to keep the UI responsive
 - Fully client-side — no server, no uploads, your data stays local
 
 #### Ready for Bambu Studio
 
-Exported 3MF files open directly in Bambu Studio (and other slicers) with all bins positioned on the baseplate, ready to slice and print.
+The exporter includes Bambu Studio metadata. Normal exports position bins on the build plate without including the preview baseplate; **Fit Test** includes a printable baseplate as a separate object. Automated tests check the serialized meshes, not slicer application behavior.
 
 ![Bambu Studio 3MF Preview](.github/images/bambulabA1.png)
 
@@ -181,6 +182,15 @@ npm run build
 npm run preview
 ```
 
+### Verify the Fit
+
+```bash
+npm test
+npm run export:fit-test
+```
+
+The second command writes `artifacts/gridfinity-fit-test.3mf` using the same geometry and packaging as the browser. Print at **100% scale**, then test both bins in both baseplate cells and stacked in both directions. See the [fit-test guide](docs/guide/fit-test.md) for dimensions and troubleshooting.
+
 ### Docker
 
 ```bash
@@ -211,13 +221,15 @@ src/
 │
 ├── gridfinity/
 │   ├── constants.ts             # Gridfinity dimensions & presets
+│   ├── spec.ts                  # Mating dimensions and height conventions
 │   ├── binGeometry.ts           # Manifold CSG bin generation
 │   ├── baseplateGeometry.ts     # Manifold CSG baseplate generation
-│   ├── profiles.ts              # Z-profile cross sections
+│   ├── profiles.ts              # Exact rounded-ring profile lofts
+│   ├── meshData.ts              # Validated Z-up mesh extraction
+│   ├── fitKit.ts                # Printable two-bin + baseplate test
 │   └── export3mf.ts             # 3MF packaging (JSZip + XML)
 │
 ├── hooks/
-│   ├── useManifold.ts           # WASM initialization
 │   └── useManifoldWorker.ts     # Web Worker interface
 │
 ├── workers/
@@ -225,8 +237,7 @@ src/
 │
 └── utils/
     ├── collision.ts             # AABB collision detection
-    ├── gridMath.ts              # Screen <-> Grid coordinate math
-    └── meshToThree.ts           # Manifold mesh -> Three.js geometry
+    └── gridMath.ts              # Screen <-> Grid coordinate math
 ```
 
 ---
@@ -267,7 +278,7 @@ The 3MF format is a ZIP archive (OPC package) containing XML mesh data. The expo
 
 ## Gridfinity Specification
 
-This tool implements the [official Gridfinity specification](https://gridfinity.xyz/specification/):
+Dimensional reference: the [community Gridfinity specification](https://gridfinity.xyz/specification/). This is not a certification of printed fit; printer calibration and material still matter.
 
 | Dimension | Value |
 |-----------|-------|
@@ -278,8 +289,9 @@ This tool implements the [official Gridfinity specification](https://gridfinity.
 | Base height | 4.75 mm |
 | Wall thickness | 1.2 mm |
 | Bottom thickness | 0.8 mm |
-| Stacking lip | 4.4 mm |
-| Magnet holes | 6mm diameter, 2mm deep |
+| Printed stacking lip | 3.8 mm (4.4 mm theoretical profile, 0.6 mm tip trim) |
+| Total height | H × 7 mm, plus 3.8 mm with stacking lip; foot already included |
+| Magnet holes | 6.5mm diameter, 2.4mm deep by default |
 | Screw holes | M3 (3.2mm clearance) |
 
 ---

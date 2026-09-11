@@ -18,13 +18,15 @@ src/
 │
 ├── gridfinity/
 │   ├── constants.ts             # Gridfinity dimensions, presets, groups, templates
+│   ├── spec.ts                  # Shared mating dimensions and total height
 │   ├── binGeometry.ts           # Manifold CSG bin generation (preview + export)
 │   ├── baseplateGeometry.ts     # Manifold CSG baseplate generation
-│   ├── profiles.ts              # Z-profile cross sections
+│   ├── profiles.ts              # Rounded-ring profile lofts
+│   ├── meshData.ts              # Validated mesh extraction in millimeters, Z-up
+│   ├── fitKit.ts                # Two-bin + baseplate printable fit test
 │   └── export3mf.ts             # 3MF packaging (JSZip + XML)
 │
 ├── hooks/
-│   ├── useManifold.ts           # WASM initialization hook
 │   └── useManifoldWorker.ts     # Web Worker interface hook
 │
 ├── workers/
@@ -32,8 +34,7 @@ src/
 │
 └── utils/
     ├── collision.ts             # AABB collision detection
-    ├── gridMath.ts              # Screen ↔ Grid coordinate math
-    └── meshToThree.ts           # Manifold mesh → Three.js BufferGeometry
+    └── gridMath.ts              # Screen ↔ Grid coordinate math
 ```
 
 ## Key Modules
@@ -52,12 +53,16 @@ Zustand store containing all application state:
 ### Geometry Engine (`binGeometry.ts`)
 
 Two entry points:
+
 - `generateBinPreview()` — Fast geometry for real-time 3D preview
-- `generateBinExport()` — Full 5-layer base profile for 3MF export
+- `generateBinExport()` — Higher curve resolution for 3MF export
+
+Both use the same foot and socket profiles. `baseplateGeometry.ts` generates actual socket geometry for the preview and the printable fit test. WASM initialization lives in the worker; conversion to Three.js geometry lives in the viewport.
 
 ### 2D Grid (`GridCanvas2D.tsx`)
 
 SVG-based canvas handling:
+
 - Mouse interactions (click, drag, resize, rotate)
 - Drop targets (drag from sidebar)
 - Keyboard shortcuts
@@ -66,6 +71,7 @@ SVG-based canvas handling:
 ### 3D Viewport (`Viewport3D.tsx`)
 
 Three.js scene management:
+
 - 3 render modes (Solid, X-Ray, Blueprint)
 - Camera presets with animation
 - Section view with clipping plane

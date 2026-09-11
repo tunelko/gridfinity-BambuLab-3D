@@ -60,3 +60,8 @@ Toggle the **section view** to enable a clipping plane that cuts through your bi
 ### Dimension Labels
 
 Toggle **dimension labels** to display real-world measurements overlaid on the selected bin in 3D space.
+
+Heights include the printed stacking lip when enabled. The displayed baseplate
+has real sockets generated in the worker, aligned with the feet's insertion
+datum; it is no longer a solid placeholder. Normal bin exports contain only
+the bins. **Fit Test** also exports a small baseplate for physical checks.

@@ -4,6 +4,7 @@ import { GF } from '../gridfinity/constants';
 import { binToConfig } from '../gridfinity/binGeometry';
 import { requestMesh } from '../hooks/useManifoldWorker';
 import { exportTo3MF, downloadBlob } from '../gridfinity/export3mf';
+import { createFitKit } from '../gridfinity/fitKit';
 
 // ── Toast ──
 function Toast({ message, onClose }: { message: string; onClose: () => void }) {
@@ -273,13 +274,28 @@ export default function Toolbar() {
     setToast(`Cleared ${count} ${count === 1 ? 'bin' : 'bins'}`);
   }
 
+  async function handleFitKit() {
+    setExporting(true);
+    setExportProgress('Generating fit test...');
+    try {
+      const meshes = await createFitKit({
+        bin: (config) => requestMesh('export', config),
+        plate: (config) => requestMesh('baseplate', config),
+      });
+      downloadBlob(await exportTo3MF(meshes), 'gridfinity-fit-test.3mf');
+      setToast('Fit test: print both bins and the baseplate at 100% scale');
+    } catch (err) {
+      setToast('Fit test export failed — ' + String(err));
+    } finally { setExporting(false); setExportProgress(''); }
+  }
+
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const toggleSidebar = useStore((s) => s.toggleSidebar);
 
   return (
     <>
       <div
-        className="flex items-center shrink-0"
+        className="flex items-center shrink-0 overflow-x-auto"
         style={{ padding: '0 16px', height: 48, gap: 12, background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}
         role="toolbar" aria-label="Main toolbar"
         data-onboarding="toolbar"
@@ -373,6 +389,10 @@ export default function Toolbar() {
 
           <TBtn onClick={() => handleExport('all')} disabled={exporting || bins.length === 0} variant="accent" ariaLabel="Export all bins">
             {exporting ? exportProgress || 'Exporting...' : 'Export All'}
+          </TBtn>
+
+          <TBtn onClick={handleFitKit} disabled={exporting} ariaLabel="Export fit test: two bins and a baseplate">
+            Fit Test
           </TBtn>
 
           <TBtn onClick={() => setShowClearModal(true)} disabled={bins.length === 0} variant="danger" ariaLabel="Clear all bins">
