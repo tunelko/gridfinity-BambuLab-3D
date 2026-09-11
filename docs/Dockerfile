@@ -3,8 +3,8 @@ FROM node:24-alpine AS build
 
 WORKDIR /docs
 
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY . .
 RUN npx vitepress build
