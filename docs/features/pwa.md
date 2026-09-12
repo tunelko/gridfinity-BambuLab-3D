@@ -23,17 +23,21 @@ Gridfinity Builder is a Progressive Web App — install it on your device for of
 
 ## Offline Support
 
-After the first visit, all assets are cached via **Service Worker** (Workbox):
+Workbox precaches the production application bundle and matching assets after
+service-worker installation. Fonts are cached when fetched successfully:
 
 - Application code and assets
 - WASM binaries (Manifold CSG engine, up to 10MB limit)
 - Google Fonts (runtime cache, CacheFirst strategy)
 
-You can design, preview, and export 3MF files entirely offline.
+With the required assets cached, geometry generation and ZIP/3MF/STL export can run
+offline. A first visit without a network connection cannot populate that cache.
+Optional GitHub Gist publishing always requires network access.
 
 ## Updating
 
-The app uses **autoUpdate** registration — it checks for updates in the background and applies them on next load.
+The Vite PWA configuration uses `registerType: 'prompt'`, not `autoUpdate`.
+Do not assume that an already-open tab is running the latest deployment.
 
 To force an immediate update:
 

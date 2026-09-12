@@ -1,321 +1,111 @@
 # Gridfinity Builder
 
-**Browser-based parametric CAD tool for designing, previewing, and exporting 3D-printable Gridfinity storage layouts.**
+Browser-based parametric CAD for designing Gridfinity storage layouts, inspecting their geometry, and exporting models for 3D printing. Geometry generation and file packaging run locally in the browser.
 
-Built for makers, 3D printing enthusiasts, and anyone who wants to organize their workspace with the Gridfinity modular storage system.
+[Open the application](https://gridfinity.securedev.codes/) · [Documentation](https://gridfinity-docs.securedev.codes/) · [Print a fit test](docs/guide/fit-test.md)
 
-> Gridfinity is an open-source modular storage system created by [Zack Freedman](https://www.youtube.com/@ZackFreedman). This tool helps you design custom bin layouts and export them as 3MF files ready for slicing.
+![Solid 3D preview showing six configurable bins and a socket baseplate](docs/public/images/workspace-3d.png)
 
-🌐 **Live Demo:** [gridfinity.securedev.codes](https://gridfinity.securedev.codes/)
+Different footprints, heights, dividers, and label shelves in one layout. Colours distinguish bins in the editor; they are not a multi-material print assignment.
 
-📖 **Documentation:** [gridfinity-docs.securedev.codes](https://gridfinity-docs.securedev.codes/)
+## Design and inspect
 
-![Gridfinity Builder](.github/images/gridbins.png)
+- Place, resize, rotate, and arrange bins on a 42 mm grid with collision detection.
+- Configure dimensions, walls, floors, dividers, stacking lips, label shelves, and magnet or screw recesses.
+- Inspect the model in Solid, X-Ray, or Blueprint mode, with camera presets, dimensions, and section views.
+- Use multi-selection, copy/paste, undo/redo, presets, and layout templates.
+- Save layouts in the browser, import or export JSON, and share a layout link. GitHub Gist publishing is an optional, explicitly initiated upload.
+- Estimate material use and filament cost before checking the final figures in your slicer.
 
----
+![Six-bin layout in the 2D editor with its matching 3D preview](docs/public/images/workspace-overview.png)
 
-## Features
+The same layout in the editor and 3D viewport. The preview baseplate provides a placement and fit reference; it is not included in normal bin exports.
 
-### Interactive 2D Grid
+## Export and check the fit
 
-Design your layout on a pannable, zoomable 2D grid with real-time visual feedback.
+| Toolbar action | Download contents |
+|---|---|
+| Export Bin | ZIP with the selected bin as 3MF and STL |
+| Export All | ZIP with one multi-object 3MF and a separate STL for each bin, preserving layout positions |
+| Fit Test | ZIP with two identical 1 × 1 × 1u bins and one 2 × 1 baseplate, in both formats and separated for printing |
 
-- **Drag & drop** bins with collision detection and snap-to-grid behavior
-- **Resize handles** on all 4 edges to grow or shrink bins
-- **Rotate handle** for non-square bins (swap width and depth)
-- **Interior dividers** with +/- controls directly on the grid
-- **Measurement overlay** showing real-world mm dimensions (CAD-style cotas)
-- **Placement ghost** (green = valid, red = collision)
-- **Snap-back animation** when a drag is rejected
+**ZIP (3MF + STL)** is the default format. Extract the ZIP and open `model.3mf`
+or the files under `stl/`, not both together. Select **3MF only** in the toolbar
+for a direct 3MF download. STL has no standard unit field: import in millimetres
+at 100% scale. Each ZIP includes these instructions in `README.txt`.
 
-### Real-Time 3D Preview
+The files contain model geometry, not sliced toolpaths or a configured printer/filament profile. Select those settings in your slicer. The workspace baseplate is excluded from **Export Bin** and **Export All**; only **Fit Test** includes a printable test baseplate.
 
-See your bins rendered in 3D as you design, powered by Three.js and Manifold WASM CSG engine.
+Before printing a full layout:
 
-- **Three render modes**: Solid (PBR plastic), X-Ray (transparent + edges), Blueprint (flat white + dark outlines)
-- **Camera presets**: Isometric, Front, Top — with smooth animation
-- **Section view**: Cutaway mode to inspect internal geometry
-- **Dimension labels**: Real-world measurements displayed in 3D
-- **OrbitControls**: Rotate, pan, and zoom the 3D viewport
+1. Download **Fit Test**, extract the ZIP, and import `model.3mf` at 100% scale.
+2. Check that each bin measures 41.5 × 41.5 × 10.8 mm and the baseplate measures 84 × 42 × 5 mm.
+3. Print the three objects and check insertion, rotation, and stacking in both directions.
+4. Also check against a known-good external Gridfinity baseplate.
 
-![3D Preview](.github/images/3d-preview.png)
+The mating profiles follow the community dimensional reference. Body corner-radius and wall-thickness controls are independent of the mating socket. Tests cover dimensions, interference, and meshes read back from the actual 3MF archive. They do not certify a physical printer, material profile, or slicer version. No independent 3MF conformance validator or automated slicer import is currently part of the test suite.
 
-#### X-Ray Mode
+![Section view of a 2 by 2 bin with its floor, feet and dimension labels](docs/public/images/geometry-section.png)
 
-Transparent wireframe view for inspecting bin internals, base profiles, and stacking geometry.
+Section view of a 2 × 2 × 4u bin. Its displayed 31.8 mm height includes the 3.8 mm printed stacking lip. The cutaway is a viewing aid and does not cut the exported model.
 
-![X-Ray Mode](.github/images/gridfinity-xray.png)
+See [export behaviour](docs/features/export.md), [download verification](docs/architecture/export-validation.md), [fit-test instructions](docs/guide/fit-test.md), and the [geometry verification record](docs/architecture/fit-validation.md).
 
-### Accurate Gridfinity Geometry
+## Run locally
 
-Mating geometry follows the community Gridfinity drawing, with independent dimensional and interference tests. Print the [fit test](docs/guide/fit-test.md) before committing to a large layout.
-
-- **Z-profile base** with stepped chamfers for baseplate interlocking
-- **Configurable body corner radius** (0mm sharp to 3.75mm standard; feet and sockets stay fixed)
-- **Wall & bottom thickness** control (default 1.2mm / 0.8mm)
-- **Stacking lip** (+3.8mm printable height; theoretical 4.4mm tip trimmed by 0.6mm)
-- **Label shelf** with configurable width and 45-degree angle, limited to cavity depth to protect the floor and feet
-- **Magnet holes** (6.5mm holes for nominal 6mm magnets, 4 per cell unit)
-- **Screw holes** (M3, 4 per cell unit)
-- **Interior dividers** (up to 9 per axis, wall-to-wall)
-- **Multi-cell bins** with correct 42mm cell spacing
-
-![Bin Configurator](.github/images/bin-config.png)
-
-### 3MF Export
-
-Export your designs as industry-standard 3MF files, ready for PrusaSlicer, Cura, or Bambu Studio.
-
-- **Export single bin** or **all bins** as multi-object 3MF
-- **Fit Test** exports two matching 1x1 bins and a real 2x1 socket baseplate
-- **Manifold CSG** ensures watertight, printable meshes
-- **Web Worker** offloads heavy geometry generation to keep the UI responsive
-- Fully client-side — no server, no uploads, your data stays local
-
-#### Ready for Bambu Studio
-
-The exporter includes Bambu Studio metadata. Normal exports position bins on the build plate without including the preview baseplate; **Fit Test** includes a printable baseplate as a separate object. Automated tests check the serialized meshes, not slicer application behavior.
-
-![Bambu Studio 3MF Preview](.github/images/bambulabA1.png)
-
-### Auto-Fill & Optimization Tools
-
-- **Auto-fill**: Fill all empty grid space with bins of a chosen size (W x D x H)
-- **Optimize Layout**: Automatically find the smallest baseplate that fits all your bins using bin-packing heuristics
-- **Print Labels**: Generate a printable sheet with labels for each bin (name, dimensions, grid position, features)
-
-### Bill of Materials & Cost Estimator
-
-Automatically generated summary of your layout with PLA cost calculation.
-
-- Bins grouped by type with count
-- Total plastic volume (cm3)
-- PLA weight estimate (1.24 g/cm3 density)
-- Cost calculator with configurable price per kg (default 20 €/kg)
-
-![BOM & Tools](.github/images/bom.png)
-
-### Save, Load & Share
-
-- **Save/Load layouts** to browser localStorage
-- **URL sharing**: Encode your entire layout in a URL hash — share a link and the recipient sees your exact design
-- **Copy Share Link** button with clipboard fallback for PWA
-
-### Progressive Web App (PWA)
-
-Install Gridfinity Builder on your device for offline use.
-
-- Works offline after first load (all assets cached via Service Worker)
-- Installable on desktop and mobile (Chrome, Edge, Safari)
-- **Check for Updates** button to force-refresh cached assets
-
----
-
-## Printer & Baseplate Presets
-
-| Preset | Grid | Real Size |
-|--------|------|-----------|
-| Bambu Lab A1 | 6 x 6 | 252 x 252 mm |
-| Bambu Lab A1 Mini | 4 x 4 | 168 x 168 mm |
-| Bambu Lab P1S | 6 x 6 | 252 x 252 mm |
-| Bambu Lab X1C | 6 x 6 | 252 x 252 mm |
-| Bambu Lab X1E | 6 x 6 | 252 x 252 mm |
-| Bambu Lab H2D | 6 x 6 | 252 x 252 mm |
-| 19" Server Rack | 10 x 8 | 420 x 336 mm |
-| Custom | Any | Any |
-
-## Bin Presets
-
-| Name | Size | Features |
-|------|------|----------|
-| Small Parts | 1x1x3u | Stacking lip |
-| Screwdriver | 1x4x6u | Tall, narrow |
-| Socket Tray | 2x2x2u | 3x3 dividers |
-| Deep Bin | 2x2x6u | Stacking lip + label shelf |
-| Wide Shallow | 3x2x2u | Stacking lip |
-| SFP Tray | 2x1x2u | 5 X-dividers (network modules) |
-| Cable Mgmt | 1x6x3u | Long, for cable runs |
-
----
-
-## Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `R` | Rotate selected bin (swap W and D) |
-| `Delete` / `Backspace` | Remove selected bin(s) |
-| `Escape` | Cancel placing / dragging / resizing |
-| `Ctrl+C` | Copy selected bin(s) |
-| `Ctrl+V` | Paste (auto-place in first free position) |
-| `Ctrl+D` | Duplicate selected bin(s) |
-| `Ctrl+A` | Select all bins |
-| `Ctrl+Z` | Undo |
-| `Ctrl+Shift+Z` | Redo |
-| `Shift + Left Click` | Multi-select (toggle bin in/out of selection) |
-| `Middle Mouse` | Pan the grid |
-| `Scroll Wheel` | Zoom (0.2x to 5x) |
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ (LTS recommended)
-- npm 9+
-
-### Install & Run
+Use Node.js 24 and its bundled npm, matching the CI and container builds. The browser needs WebAssembly, Web Workers, and WebGL 2 for the 3D viewport.
 
 ```bash
 git clone https://github.com/tunelko/gridfinity-BambuLab-3D.git
 cd gridfinity-BambuLab-3D
-npm install
+npm ci
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open [localhost:5173](http://localhost:5173). Keep the development server local; use the production build for a public deployment.
 
-### Production Build
-
-```bash
-npm run build
-npm run preview
-```
-
-### Verify the Fit
+### Build and test
 
 ```bash
 npm test
+npm run build
 npm run export:fit-test
+npm ci --prefix docs
+npm run build --prefix docs
 ```
 
-The second command writes `artifacts/gridfinity-fit-test.3mf` using the same geometry and packaging as the browser. Print at **100% scale**, then test both bins in both baseplate cells and stacked in both directions. See the [fit-test guide](docs/guide/fit-test.md) for dimensions and troubleshooting.
+The application build is written to `dist/`, the documentation build to `docs/.vitepress/dist/`, and the printable test to `artifacts/gridfinity-fit-test.3mf`. Generated build and fit-test artifacts are not committed.
 
-### Docker
+### Run with Docker
 
 ```bash
-docker compose build --no-cache
-docker compose up -d
+docker compose build app docs
+docker compose up -d app docs
 ```
 
-The app will be available at `http://localhost:5173`.
+The application is served on port 5173 and documentation on port 4173. Both containers serve static production files through nginx. See [Docker setup](docs/guide/docker.md) for operational details.
 
----
+## Quality and security
 
-## Architecture
+The [CI workflow](.github/workflows/ci.yml) installs the locked dependencies, checks TypeScript, builds the application, and runs the test suite on pushes and pull requests targeting `main` or `develop`.
 
-```
-src/
-├── main.tsx                     # Entry point
-├── App.tsx                      # Layout: Toolbar + Sidebar + Canvas
-│
-├── store/
-│   └── useStore.ts              # Zustand store (bins, grid, undo/redo)
-│
-├── components/
-│   ├── Toolbar.tsx              # Top bar: view modes, export, camera
-│   ├── Sidebar.tsx              # Left panel: presets, bin list, BOM, tools
-│   ├── GridCanvas2D.tsx         # 2D SVG grid with all interactions
-│   ├── BinConfigurator.tsx      # Bin parameter editor
-│   └── Viewport3D.tsx           # Three.js 3D preview
-│
-├── gridfinity/
-│   ├── constants.ts             # Gridfinity dimensions & presets
-│   ├── spec.ts                  # Mating dimensions and height conventions
-│   ├── binGeometry.ts           # Manifold CSG bin generation
-│   ├── baseplateGeometry.ts     # Manifold CSG baseplate generation
-│   ├── profiles.ts              # Exact rounded-ring profile lofts
-│   ├── meshData.ts              # Validated Z-up mesh extraction
-│   ├── fitKit.ts                # Printable two-bin + baseplate test
-│   └── export3mf.ts             # 3MF packaging (JSZip + XML)
-│
-├── hooks/
-│   └── useManifoldWorker.ts     # Web Worker interface
-│
-├── workers/
-│   └── manifoldWorker.ts        # Background geometry generation
-│
-└── utils/
-    ├── collision.ts             # AABB collision detection
-    └── gridMath.ts              # Screen <-> Grid coordinate math
-```
+The [security workflow](.github/workflows/security.yml) runs on `main` pushes and pull requests, by manual request, and weekly. It checks dependencies, source code, committed secrets, and the root Dockerfile. npm audit and Grype fail on high or critical findings; Hadolint fails on errors or warnings. Available reports are still uploaded after a failure. See the [security policy and verification record](docs/architecture/dependency-validation.md) for scope and thresholds.
 
----
+These workflows do not deploy the application, build the Docker images, or automate physical printing. Merge protection and required checks are separate GitHub repository settings.
 
-## How It Works
+## Documentation
 
-### Geometry Pipeline
+| Topic | Reference |
+|---|---|
+| First layout and local setup | [Getting started](docs/guide/getting-started.md) |
+| Parameters and dimensions | [Bin configuration](docs/features/bin-configuration.md) · [Dimensional reference](docs/reference/specification.md) |
+| Editing and inspection | [2D editor](docs/features/2d-grid.md) · [3D preview](docs/features/3d-preview.md) |
+| Output files and validation | [ZIP, 3MF and STL export](docs/features/export.md) · [3MF structure](docs/architecture/3mf-format.md) |
+| Presets and shortcuts | [Printer presets](docs/reference/printer-presets.md) · [Bin presets](docs/reference/bin-presets.md) · [Keyboard shortcuts](docs/reference/keyboard-shortcuts.md) |
+| Implementation | [Project structure](docs/architecture/project-structure.md) · [Geometry pipeline](docs/architecture/geometry-pipeline.md) |
 
-```
-User changes bin config
-  -> Zustand store updates
-  -> Web Worker receives config
-  -> Manifold WASM generates CSG mesh
-  -> Mesh transferred back to main thread
-  -> Converted to Three.js BufferGeometry
-  -> 3D viewport updates in real-time
-```
+## Project and acknowledgements
 
-### CSG Algorithm
+Maintained by [tunelko](https://github.com/tunelko). Gridfinity was created by [Zack Freedman](https://www.youtube.com/@ZackFreedman). The application uses React, TypeScript, Three.js, Manifold 3D, Zustand, Vite, and JSZip.
 
-Each bin is built through boolean operations:
-
-1. **Outer shell** — Rounded box (configurable corner radius)
-2. **Inner cavity** — Subtracted to create walls and floor
-3. **Base profile** — Stepped Z-profile added for baseplate interlocking
-4. **Features** — Magnet/screw holes subtracted, dividers and lip added
-
-### 3MF Export
-
-The 3MF format is a ZIP archive (OPC package) containing XML mesh data. The exporter:
-
-1. Extracts vertices and triangles from Manifold meshes
-2. Serializes to 3MF XML format with proper namespaces
-3. Packages with JSZip as a valid OPC archive
-4. Triggers browser download
-
----
-
-## Gridfinity Specification
-
-Dimensional reference: the [community Gridfinity specification](https://gridfinity.xyz/specification/). This is not a certification of printed fit; printer calibration and material still matter.
-
-| Dimension | Value |
-|-----------|-------|
-| Cell size | 42 x 42 mm |
-| Height unit | 7 mm |
-| Tolerance | 0.5 mm (0.25 per side) |
-| Bin corner radius | 3.75 mm |
-| Base height | 4.75 mm |
-| Wall thickness | 1.2 mm |
-| Bottom thickness | 0.8 mm |
-| Printed stacking lip | 3.8 mm (4.4 mm theoretical profile, 0.6 mm tip trim) |
-| Total height | H × 7 mm, plus 3.8 mm with stacking lip; foot already included |
-| Magnet holes | 6.5mm diameter, 2.4mm deep by default |
-| Screw holes | M3 (3.2mm clearance) |
-
----
-
-## Browser Compatibility
-
-| Browser | Support |
-|---------|---------|
-| Chrome / Edge | Full (install + offline) |
-| Firefox | Partial (offline, no install prompt) |
-| Safari (macOS) | Partial (manual Add to Dock) |
-| Safari (iOS) | Partial (Add to Home Screen) |
-
-Requires WASM support and a modern browser with ES2020+ capabilities.
-
----
-
-## License
-
-This project is open source. Gridfinity is MIT licensed by [Zack Freedman](https://www.youtube.com/@ZackFreedman).
-
-## Credits
-
-- Built by [tunelko](https://github.com/tunelko)
-- [Gridfinity](https://gridfinity.xyz) by Zack Freedman
-- [Manifold](https://github.com/elalish/manifold) — WASM CSG engine
-- [Three.js](https://threejs.org) — 3D rendering
+Screenshots were captured from the application production build on 12 September 2026 in Chromium at 1600 × 1000 pixels. They show example layouts, not photographs of printed parts or evidence of slicer certification. See [documentation capture notes](docs/architecture/documentation-validation.md) for provenance and verification.

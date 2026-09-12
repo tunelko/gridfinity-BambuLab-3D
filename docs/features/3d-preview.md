@@ -2,7 +2,7 @@
 
 The 3D viewport renders your bins in real-time as you design, powered by Three.js and Manifold WASM CSG engine.
 
-![3D Preview](/images/3d-preview.png)
+![Solid preview of bins with different sizes and interior features](/images/workspace-3d.png)
 
 ## Render Modes
 
@@ -25,8 +25,6 @@ Transparent view for inspecting bin internals:
 - Cyan edge lines
 - Flat lighting
 - Great for checking base profiles and stacking geometry
-
-![X-Ray Mode](/images/gridfinity-xray.png)
 
 ### Blueprint Mode
 
@@ -56,6 +54,10 @@ All presets animate smoothly to the new position.
 ### Section View
 
 Toggle the **section view** to enable a clipping plane that cuts through your bins, revealing internal geometry like wall thickness, base profile, and divider placement.
+
+![Section view of a 2 by 2 by 4u bin with dimension labels](/images/geometry-section.png)
+
+This is a viewport clipping plane, not a change to the CAD model. Section view, colours, and dimension overlays are not exported as printable geometry.
 
 ### Dimension Labels
 

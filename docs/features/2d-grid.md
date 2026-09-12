@@ -2,7 +2,7 @@
 
 The 2D grid is the primary workspace for designing your Gridfinity layout. It's a pannable, zoomable SVG canvas with real-time visual feedback.
 
-![Gridfinity Builder](/images/gridbins.png)
+![Six-bin layout in the 2D editor with its matching 3D preview](/images/workspace-overview.png)
 
 ## Interactions
 

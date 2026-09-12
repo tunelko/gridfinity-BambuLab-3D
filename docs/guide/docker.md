@@ -25,27 +25,25 @@ no dev server** — only static assets behind nginx.
 | `app`   | 5173      | Vite production build (`dist/`) |
 | `docs`  | 4173      | VitePress build (`.vitepress/dist/`) |
 
-Deploying a change is always: rebuild image + restart container.
+To deploy changed source, rebuild the relevant image and recreate its container. The GitHub workflows currently test and scan the repository; they do not perform this deployment.
 
 ## Useful Commands
 
 | Command | Description |
 |---------|-------------|
-| `docker compose build --no-cache` | Rebuild the images (always use `--no-cache`) |
+| `docker compose build app docs` | Rebuild the two project images; this Compose file already sets `no_cache: true` |
 | `docker compose up -d` | Start in background |
 | `docker compose logs --tail 30` | View recent logs |
 | `docker compose down` | Stop the containers |
 
-::: tip
-Always use `--no-cache` when building to ensure all modified files are applied.
-:::
+The repository deliberately disables build caching in Compose. This is a project setting, not a general requirement for Docker to pick up changed source files.
 
 ## Local development
 
 For hot-reload development, run Vite directly (outside Docker):
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 

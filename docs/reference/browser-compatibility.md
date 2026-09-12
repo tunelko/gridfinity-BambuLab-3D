@@ -2,14 +2,12 @@
 
 Gridfinity Builder requires WASM support and a modern browser with ES2020+ capabilities.
 
-## Support Matrix
+## Verification Status
 
-| Browser | Support | Install | Offline |
-|---------|---------|---------|---------|
-| **Chrome / Edge** | Full | Yes (PWA prompt) | Yes |
-| **Firefox** | Full | No prompt | Yes |
-| **Safari (macOS)** | Partial | Manual (Add to Dock) | Yes |
-| **Safari (iOS)** | Partial | Manual (Add to Home) | Yes |
+The recorded geometry/export browser checks and the September 2026 documentation
+captures used Chromium 152. They are not a cross-browser certification. Firefox,
+Safari, Edge, and mobile devices have not been re-tested as part of this update.
+Verify preview, export, and offline behaviour on the browser you intend to use.
 
 ## Requirements
 
@@ -21,6 +19,6 @@ Gridfinity Builder requires WASM support and a modern browser with ES2020+ capab
 
 ## Known Limitations
 
-- **Firefox**: No install prompt for PWA, but offline caching works via Service Worker
-- **Safari**: WebAssembly performance may be slower than Chromium browsers
-- **Mobile**: The UI is designed for desktop; mobile works but with limited screen space for the 2D/3D viewports
+- Installation controls and service-worker storage policies depend on the browser.
+- Offline use requires the application assets to have been successfully cached beforehand; optional Gist publishing still needs network access.
+- Desktop-sized screens provide more space for the sidebar and simultaneous 2D/3D views. Mobile interactions and performance need separate verification.
