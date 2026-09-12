@@ -5,6 +5,10 @@ hero:
   name: Gridfinity Builder
   text: Parametric CAD for 3D-printable storage
   tagline: Design bin layouts, inspect mating geometry, and export models for your slicer.
+  image:
+    light: /images/gridlogo_munids.png
+    dark: /images/gridlogo_munids_dark.png
+    alt: Gridfinity Builder
   actions:
     - theme: brand
       text: Get Started

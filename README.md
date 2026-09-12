@@ -85,14 +85,6 @@ docker compose up -d app docs
 
 The application is served on port 5173 and documentation on port 4173. Both containers serve static production files through nginx. See [Docker setup](docs/guide/docker.md) for operational details.
 
-## Quality and security
-
-The [CI workflow](.github/workflows/ci.yml) installs the locked dependencies, checks TypeScript, builds the application, and runs the test suite on pushes and pull requests targeting `main` or `develop`.
-
-The [security workflow](.github/workflows/security.yml) runs on `main` pushes and pull requests, by manual request, and weekly. It checks dependencies, source code, committed secrets, and the root Dockerfile. npm audit and Grype fail on high or critical findings; Hadolint fails on errors or warnings. Available reports are still uploaded after a failure. See the [security policy and verification record](docs/architecture/dependency-validation.md) for scope and thresholds.
-
-These workflows do not deploy the application, build the Docker images, or automate physical printing. Merge protection and required checks are separate GitHub repository settings.
-
 ## Documentation
 
 | Topic | Reference |
