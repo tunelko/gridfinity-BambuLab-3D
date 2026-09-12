@@ -41,6 +41,32 @@ Upstream evidence: [Vitest's patched-version advisory](https://github.com/vitest
 
 The browser and container checks for this maintenance unit are recorded in its commit message. The original geometry checks are in the [mating-profile verification record](./fit-validation.md).
 
+## Blocking security policy
+
+The Security Scan workflow fails when npm audit or Grype reports **one or more high or critical vulnerabilities**. Lower-severity findings remain visible without failing those scanners. Scanner execution errors also fail the job; missing reports are not treated as evidence of a clean scan.
+
+| Check | Failure threshold and scope |
+|---|---|
+| npm audit | High or critical, in either the application or documentation dependency tree, including development dependencies. Both use `npm ci --ignore-scripts --no-audit` and their committed lockfiles before `npm audit --audit-level=high`. |
+| Grype | High or critical, including findings without an available fix. The filesystem scan retains its existing repository scope. |
+| Hadolint | Error or warning in the root Dockerfile. These are lint levels, not CVSS high/critical classifications. Info/style findings remain advisory. |
+
+Independent jobs continue collecting findings after another job fails. Hadolint and Grype still upload an available SARIF report after failure; uploading the report does not turn the failed job green. No severity overrides, advisory dismissals, or new exclusions are added.
+
+`npm test -- scripts/security-policy.test.mjs` checks the configured thresholds, both npm roots, failure propagation, and SARIF upload conditions. It is a static policy regression test, not a YAML validator or an end-to-end GitHub runner test. The five checks failed against the previous workflow before its permissive settings were changed.
+
+Local verification on 2026-09-12:
+
+- `npm test`: 45 tests passed; the focused policy and 3MF command (`npm test -- scripts/security-policy.test.mjs src/gridfinity/export3mf.test.ts`) passed all 6 tests.
+- `npm audit --audit-level=high` and `npm audit --prefix docs --audit-level=high`: zero reported vulnerabilities, exit 0.
+- `npm run build` and `npm run build --prefix docs`: passed. PyYAML parsed the workflow and verified its two-directory matrix and triggers.
+- Hadolint 2.14.0, matching the pinned action, ran with `--failure-threshold warning --format json`: the root Dockerfile returned `[]` and exit 0. Harmless stdin-only fixtures with a `RUN cd /tmp` warning and an incomplete `COPY` error each returned exit 1. No fixture image was built or executed.
+- These local checks preceded the first GitHub run of the new policy. Grype's high/critical failure path was checked against the pinned action's implementation and workflow settings, not exercised with a vulnerable fixture. Check GitHub Actions for the result on the published commit.
+
+This policy does **not** add automatic deployment or change repository branch protection. A failed workflow is not itself a guarantee that GitHub prevents a merge: requiring the security checks on protected branches is a separate repository setting.
+
+Rollback this policy by reverting `.github/workflows/security.yml`, `scripts/security-policy.test.mjs`, and this section together. Dependency versions, geometry, and exported files are unchanged; rollback restores the previous non-blocking scanner behavior.
+
 ## Remaining non-audit warnings
 
 - The application bundle remains about 859KB before compression. This is a performance warning, not a vulnerability; no warning threshold was raised.

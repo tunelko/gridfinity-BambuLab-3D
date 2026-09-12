@@ -15,10 +15,17 @@ permissions:
   security-events: write
 
 jobs:
-  # npm audit for known vulnerabilities in dependencies
+  # Audit both locked trees. One high/critical finding fails its job.
   npm-audit:
-    name: npm audit
+    name: npm audit (${{ matrix.directory }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        directory: [., docs]
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
     steps:
       - uses: actions/checkout@v4
 
@@ -26,11 +33,10 @@ jobs:
         with:
           node-version: 24
 
-      - run: npm install --ignore-scripts
+      - run: npm ci --ignore-scripts --no-audit
 
       - name: Run npm audit
         run: npm audit --audit-level=high
-        continue-on-error: true
 
   # CodeQL static analysis (JavaScript/TypeScript)
   codeql:
@@ -95,7 +101,9 @@ jobs:
           dockerfile: Dockerfile
           format: sarif
           output-file: hadolint-results.sarif
-          no-fail: true
+          no-fail: 'false'
+          # Hadolint uses error/warning/info/style, not CVSS severities.
+          failure-threshold: warning
 
       - name: Upload Hadolint SARIF
         uses: github/codeql-action/upload-sarif@v4
@@ -116,12 +124,14 @@ jobs:
         with:
           path: .
           severity-cutoff: high
-          fail-build: false
+          fail-build: 'true'
+          only-fixed: 'false'
           output-format: sarif
+          output-file: grype-results.sarif
 
       - name: Upload Grype SARIF
         uses: github/codeql-action/upload-sarif@v4
-        if: always() && steps.grype.outputs.sarif != ''
+        if: always() && hashFiles('grype-results.sarif') != ''
         with:
-          sarif_file: ${{ steps.grype.outputs.sarif }}
+          sarif_file: grype-results.sarif
           category: grype
