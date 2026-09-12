@@ -11,7 +11,7 @@ interface Step {
 const STEPS: Step[] = [
   {
     title: 'Toolbar: Views & Export',
-    description: 'Switch between 2D, Split, and 3D views. Choose render modes (Solid, X-Ray, Blueprint), camera presets (Iso, Front, Top), toggle dimensions and section view. Export your layout as .3mf files ready for Bambu Studio, PrusaSlicer, or Cura.',
+    description: 'Switch between 2D, Split, and 3D views. Choose render modes and camera presets, or inspect dimensions and sections. Export a ZIP containing 3MF and STL models, or select 3MF only. Extract the ZIP, then choose your printer and filament in your slicer.',
     selector: '[data-onboarding="toolbar"]',
   },
   {

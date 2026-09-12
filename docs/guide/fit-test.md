@@ -1,12 +1,15 @@
 # Check the fit before printing a layout
 
-Use **Fit Test** in the toolbar to download `gridfinity-fit-test.3mf`. It contains
+Use **Fit Test** in the toolbar to download `gridfinity_fit-test.zip`. It contains
 two identical 1×1×1u bins with stacking lips and one 2×1 open-bottom baseplate.
 The three objects are separated on the print bed; your current layout stays intact.
+Extract the ZIP to use `model.3mf` or the three files under `stl/`. The toolbar's
+**3MF only** option downloads `gridfinity_fit-test.3mf` directly instead.
 
 ## Print and check
 
-1. Import the 3MF into your slicer and keep every object at **100% scale**.
+1. Extract the ZIP and import `model.3mf` into your slicer at **100% scale**.
+   Alternatively, import the three STLs in millimetres; do not import both formats together.
 2. Check dimensions: each bin is **41.5 × 41.5 × 10.8mm**; the plate is **84 × 42 × 5mm**.
 3. Print all three pieces with your usual material and calibrated profile, feet down.
    The file supplies geometry, not printer or filament settings.

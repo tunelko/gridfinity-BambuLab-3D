@@ -3,7 +3,8 @@ import { useStore, type ViewMode, type RenderMode } from '../store/useStore';
 import { GF } from '../gridfinity/constants';
 import { binToConfig } from '../gridfinity/binGeometry';
 import { requestMesh } from '../hooks/useManifoldWorker';
-import { exportTo3MF, downloadBlob } from '../gridfinity/export3mf';
+import { downloadBlob } from '../gridfinity/export3mf';
+import { exportPrintFile, type ExportFormat } from '../gridfinity/exportBundle';
 import { createFitKit } from '../gridfinity/fitKit';
 
 // ── Toast ──
@@ -206,6 +207,7 @@ export default function Toolbar() {
   const gridRows = useStore((s) => s.gridRows);
 
   const [exporting, setExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('zip');
   const [exportProgress, setExportProgress] = useState('');
   const [showClearModal, setShowClearModal] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -251,13 +253,11 @@ export default function Toolbar() {
         meshes.push({ mesh, name });
       }
 
-      setExportProgress('Packaging .3mf...');
-      const blob = await exportTo3MF(meshes);
-      const filename = mode === 'selected'
-        ? `${meshes[0].name}.3mf`
-        : `gridfinity_layout_${gridCols}x${gridRows}.3mf`;
+      setExportProgress(`Packaging .${exportFormat}...`);
+      const name = mode === 'selected' ? meshes[0].name : `layout_${gridCols}x${gridRows}`;
+      const { blob, filename } = await exportPrintFile(meshes, name, exportFormat);
       downloadBlob(blob, filename);
-      setToast(`Exported ${meshes.length} ${meshes.length === 1 ? 'bin' : 'bins'} as .3mf`);
+      setToast(`Exported ${meshes.length} ${meshes.length === 1 ? 'bin' : 'bins'} as .${exportFormat}`);
     } catch (err) {
       console.error('Export failed:', err);
       setToast('Export failed — ' + (err instanceof Error ? err.message : String(err)));
@@ -282,7 +282,9 @@ export default function Toolbar() {
         bin: (config) => requestMesh('export', config),
         plate: (config) => requestMesh('baseplate', config),
       });
-      downloadBlob(await exportTo3MF(meshes), 'gridfinity-fit-test.3mf');
+      setExportProgress(`Packaging .${exportFormat}...`);
+      const { blob, filename } = await exportPrintFile(meshes, 'fit-test', exportFormat);
+      downloadBlob(blob, filename);
       setToast('Fit test: print both bins and the baseplate at 100% scale');
     } catch (err) {
       setToast('Fit test export failed — ' + String(err));
@@ -380,6 +382,18 @@ export default function Toolbar() {
               <rect x="2" y="2" width="20" height="20" rx="2" /><line x1="12" y1="2" x2="12" y2="22" /><line x1="8" y1="6" x2="8" y2="6.01" /><line x1="8" y1="10" x2="8" y2="10.01" /><line x1="8" y1="14" x2="8" y2="14.01" /><line x1="8" y1="18" x2="8" y2="18.01" />
             </svg>
           </TBtn>
+
+          <select
+            aria-label="Export format"
+            value={exportFormat}
+            disabled={exporting}
+            onChange={event => setExportFormat(event.target.value as ExportFormat)}
+            className="rounded-md shrink-0 disabled:opacity-40"
+            style={{ padding: '8px', fontSize: 13, background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+          >
+            <option value="zip">ZIP (3MF + STL)</option>
+            <option value="3mf">3MF only</option>
+          </select>
 
           {selectedBinId && (
             <TBtn onClick={() => handleExport('selected')} disabled={exporting} variant="accent" ariaLabel="Export selected bin">
