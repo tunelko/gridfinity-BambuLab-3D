@@ -1,6 +1,51 @@
 # Dependency advisory remediation
 
-On 2026-09-11, the application audit went from **11 reported vulnerable packages to 0**, and the documentation audit from **3 to 0**. Both full dependency trees are checked, not only production dependencies. An empty audit means no advisories reported by the registry at that time, not a security certification.
+The 2026-10-26 maintenance updates vulnerable dependencies, pins a Node2Shell-patched Node release, and extends blocking scans to both build and runtime images. Geometry, Manifold 3.3.2, Three.js 0.170.0, and the export formats are unchanged. An empty audit means no advisories reported at the time of the check, not a security certification.
+
+## October 2026 remediation
+
+| Component | Updated version or control |
+|---|---|
+| Application tooling | Vite 8.1.6; Vitest and its mocker 4.1.12 |
+| Documentation tooling | VitePress 1.6.4 retained; scoped Vite override advanced to 6.4.4 |
+| Transitive dependencies | sharp 0.35.5, source-map-js 1.2.2 in both trees, fast-uri 3.1.9, serialize-javascript 7.1.4 |
+| Node | 24.22.1 in `.nvmrc`, both CI workflows, and both Docker builders; package engines require the patched Node 24 line |
+| Builder package manager | npm 11.21.1, with its bundled undici and ip-address replaced by compatible 6.29.1 and 10.7.4 releases before project installation |
+| Documentation native compiler | The same esbuild 0.25.12 source rebuilt with Go 1.27.3; both installed binary copies are replaced and its version checked |
+| Runtime images | Nginx 1.30.6 on Alpine 3.24, using the official slim variant; both base images are pinned by digest |
+| Container checks | Grype scans the build and runtime stages of both services; high/critical findings fail, including those without a fix |
+
+The previous GitHub runner selected cached Node 24.21.0 for the floating `24` request. An exact `.nvmrc` prevents that fallback. Node 24.22.1 includes the Brotli fix for [CVE-2026-111497](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases); `npm audit fix` alone cannot patch a Node executable or an OS library.
+
+The previous runtime images contained Alpine's vulnerable `brotli-libs 1.1.0-r2`, even though the active static Nginx configuration did not decode Brotli requests. The slim variant omits the unused image-processing modules and their Brotli dependencies. Runtime verification must check the actual built image rather than infer safety from the Dockerfile tag.
+
+The first image scans also found vulnerabilities in npm's own bundled packages and the Go runtime embedded in the upstream esbuild binary. These are not fixed by auditing the project lockfiles. The Docker builders explicitly remediate them without suppressions. Recheck the temporary npm bundle replacements when upstream npm incorporates the fixes. For the rebuilt native esbuild toolchain, use the docs Docker build: a host-side `npm ci --prefix docs` still installs the upstream binary, not the Docker-specific rebuild.
+
+All dependency updates remain within their existing major versions. The VitePress override is still a compatibility workaround: its Vite 6 peer compatibility and documentation navigation/search must be checked on every update. The sharp update follows Manifold's existing transitive dependency chain without changing the CAD library.
+
+### Verification for this maintenance unit
+
+- Lockfile audits for both trees: zero reported vulnerabilities after the updates.
+- New policy regressions first failed against the previous workflows: missing docs lint coverage, patched Node pin, and container scans.
+- Fresh installs from both lockfiles and both production builds passed.
+- `npm test` in the patched application builder: 59 tests passed, including eight security-policy checks. `npm run export:fit-test` generated the three-object fit kit.
+- Actual browser downloads passed for all-bin ZIP, selected-bin ZIP, fit-kit ZIP and direct 3MF. ZIP CRCs, STL triangle records, units and object counts passed, with zero browser exceptions.
+- Documentation homepage logos in both themes, local search, result navigation and the dimensional reference passed browser checks against the container built with the rebuilt esbuild binary.
+- Actionlint 1.7.12, Hadolint 2.14.0 on both Dockerfiles, and YAML matrix expansion checks passed.
+- Grype 0.121.0 with the 2026-10-26 database passed `--fail-on high` on the repository snapshot and all four service/stage images. No findings were ignored or dismissed.
+- Both runtime containers reported Nginx 1.30.6 with no Node executable or installed `brotli-libs`. Both builder images reported Node 24.22.1 and npm 11.21.1; both docs esbuild binary copies matched and reported 0.25.12.
+
+### Remaining distribution advisory
+
+Each image retains three medium-severity package matches for the same [BusyBox wget advisory, CVE-2025-60876](https://security.alpinelinux.org/vuln/CVE-2025-60876): `busybox`, `busybox-binsh`, and `ssl_client`, all 1.37.0-r31. Alpine lists that release as possibly vulnerable and provides no fixed package at the time of verification. The active static Nginx configuration does not pass visitor-supplied URLs to wget. This is not a zero-finding image scan: keep the advisory visible, monitor the distribution fix, and update the image pins when it becomes available. No custom suppression or severity reduction is applied.
+
+The checks above are local evidence, not a claim that the new GitHub workflow has run or that production has been redeployed. Verify those separately during delivery. The Docker-specific esbuild rebuild does not replace the upstream binary installed by a host-side docs `npm ci`.
+
+The rollback boundary is the two manifests/lockfiles, `.nvmrc`, both Dockerfiles, both workflows, the policy tests, and the associated documentation. Keep the geometry and export implementation unchanged. Rolling back restores vulnerable versions and is an emergency measure only.
+
+## Previous remediation (2026-09-11)
+
+On 2026-09-11, the application audit went from **11 reported vulnerable packages to 0**, and the documentation audit from **3 to 0**. Both full dependency trees were checked, not only production dependencies. The versions and results below are historical, not the current security status.
 
 ## Reproduce the checks
 
@@ -15,7 +60,7 @@ npm audit --prefix docs
 npm run build --prefix docs
 ```
 
-Use Node 24, as in the Docker builds and existing CI. Commit both lockfiles; the docs Dockerfile now uses `npm ci` instead of resolving a new dependency tree on every build.
+Use the Node release in `.nvmrc`, as in the Docker builds and CI. Commit both lockfiles; the docs Dockerfile uses `npm ci` instead of resolving a new dependency tree on every build.
 
 ## Changes and compatibility boundary
 
@@ -48,12 +93,12 @@ The Security Scan workflow fails when npm audit or Grype reports **one or more h
 | Check | Failure threshold and scope |
 |---|---|
 | npm audit | High or critical, in either the application or documentation dependency tree, including development dependencies. Both use `npm ci --ignore-scripts --no-audit` and their committed lockfiles before `npm audit --audit-level=high`. |
-| Grype | High or critical, including findings without an available fix. The filesystem scan retains its existing repository scope. |
-| Hadolint | Error or warning in the root Dockerfile. These are lint levels, not CVSS high/critical classifications. Info/style findings remain advisory. |
+| Grype | High or critical, including findings without an available fix. Scans the repository plus the build and runtime images of both services. |
+| Hadolint | Error or warning in both service Dockerfiles. These are lint levels, not CVSS high/critical classifications. Info/style findings remain advisory. |
 
 Independent jobs continue collecting findings after another job fails. Hadolint and Grype still upload an available SARIF report after failure; uploading the report does not turn the failed job green. No severity overrides, advisory dismissals, or new exclusions are added.
 
-`npm test -- scripts/security-policy.test.mjs` checks the configured thresholds, both npm roots, failure propagation, and SARIF upload conditions. It is a static policy regression test, not a YAML validator or an end-to-end GitHub runner test. The five checks failed against the previous workflow before its permissive settings were changed.
+`npm test -- scripts/security-policy.test.mjs` checks the configured thresholds, both npm roots, failure propagation, SARIF upload conditions, patched Node pins, and image-scan coverage. It is a static policy regression test, not a YAML validator or an end-to-end GitHub runner test.
 
 Local verification on 2026-09-12:
 

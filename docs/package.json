@@ -2,6 +2,9 @@
   "name": "gridfinity-docs",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": "^24.22.1"
+  },
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",
@@ -12,7 +15,7 @@
   },
   "overrides": {
     "vitepress": {
-      "vite": "6.4.3"
+      "vite": "6.4.4"
     }
   }
 }
