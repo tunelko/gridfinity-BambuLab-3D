@@ -11,15 +11,19 @@ The 2026-10-26 maintenance updates vulnerable dependencies, pins a Node2Shell-pa
 | Transitive dependencies | sharp 0.35.5, source-map-js 1.2.2 in both trees, fast-uri 3.1.9, serialize-javascript 7.1.4 |
 | Node | 24.22.1 in `.nvmrc`, both CI workflows, and both Docker builders; package engines require the patched Node 24 line |
 | Builder package manager | npm 11.21.1, with its bundled undici and ip-address replaced by compatible 6.29.1 and 10.7.4 releases before project installation |
-| Documentation native compiler | The same esbuild 0.25.12 source rebuilt with Go 1.27.3; both installed binary copies are replaced and its version checked |
+| Documentation native compiler | The same esbuild 0.25.12 source rebuilt with Go 1.27.3 and golang.org/x/sys 0.44.0; both installed binary copies are replaced and its version checked |
 | Runtime images | Nginx 1.30.6 on Alpine 3.24, using the official slim variant; both base images are pinned by digest |
-| Container checks | Grype scans the build and runtime stages of both services; high/critical findings fail, including those without a fix |
+| Container checks | Grype 0.121.0 scans the build and runtime stages of both services; high/critical findings fail, including those without a fix |
 
 The previous GitHub runner selected cached Node 24.21.0 for the floating `24` request. An exact `.nvmrc` prevents that fallback. Node 24.22.1 includes the Brotli fix for [CVE-2026-111497](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases); `npm audit fix` alone cannot patch a Node executable or an OS library.
 
 The previous runtime images contained Alpine's vulnerable `brotli-libs 1.1.0-r2`, even though the active static Nginx configuration did not decode Brotli requests. The slim variant omits the unused image-processing modules and their Brotli dependencies. Runtime verification must check the actual built image rather than infer safety from the Dockerfile tag.
 
 The first image scans also found vulnerabilities in npm's own bundled packages and the Go runtime embedded in the upstream esbuild binary. These are not fixed by auditing the project lockfiles. The Docker builders explicitly remediate them without suppressions. Recheck the temporary npm bundle replacements when upstream npm incorporates the fixes. For the rebuilt native esbuild toolchain, use the docs Docker build: a host-side `npm ci --prefix docs` still installs the upstream binary, not the Docker-specific rebuild.
+
+The GitHub image scan additionally reported [GO-2026-5024](https://pkg.go.dev/vuln/GO-2026-5024) in esbuild's old `golang.org/x/sys` dependency. The affected function is Windows-only, but the build now uses the fixed 0.44.0 module instead of retaining an affected dependency version or suppressing the alert.
+
+Both GitHub Grype jobs explicitly select 0.121.0, matching the local verification tool. The action's older implicit scanner default is no longer used.
 
 All dependency updates remain within their existing major versions. The VitePress override is still a compatibility workaround: its Vite 6 peer compatibility and documentation navigation/search must be checked on every update. The sharp update follows Manifold's existing transitive dependency chain without changing the CAD library.
 

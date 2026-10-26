@@ -46,6 +46,7 @@ describe('security workflow failure policy', () => {
     expect(job('grype')).toContain("if: always() && hashFiles('grype-results.sarif') != ''");
     expect(job('grype')).toContain('output-file: grype-results.sarif');
     expect(job('grype')).toContain('sarif_file: grype-results.sarif');
+    expect(job('grype')).toContain('grype-version: v0.121.0');
   });
 
   it('uses the patched Node release consistently in CI and Docker builders', () => {
@@ -68,7 +69,8 @@ describe('security workflow failure policy', () => {
   it('rebuilds the docs esbuild binary with a patched Go toolchain', () => {
     const dockerfile = readFileSync(new URL('../docs/Dockerfile', import.meta.url), 'utf8');
     expect(dockerfile).toContain('FROM golang:1.27.3-alpine3.24@sha256:');
-    expect(dockerfile).toContain('go install github.com/evanw/esbuild/cmd/esbuild@v0.25.12');
+    expect(dockerfile).toContain('go get github.com/evanw/esbuild@v0.25.12 golang.org/x/sys@v0.44.0');
+    expect(dockerfile).toContain('go build -o /out/esbuild github.com/evanw/esbuild/cmd/esbuild');
     expect(dockerfile).toContain('COPY --from=esbuild /out/esbuild /tmp/esbuild');
     expect(dockerfile).toContain('install -m 755 /tmp/esbuild node_modules/esbuild/bin/esbuild');
     expect(dockerfile).toContain("node_modules/@esbuild/linux-$(node -p 'process.arch')/bin/esbuild");
@@ -84,6 +86,7 @@ describe('security workflow failure policy', () => {
     expect(scan).toContain('--target "${{ matrix.target }}"');
     expect(scan).toContain('image: gridfinity-${{ matrix.service }}-${{ matrix.target }}:scan');
     expect(scan).toContain('severity-cutoff: high');
+    expect(scan).toContain('grype-version: v0.121.0');
     expect(scan).toContain("fail-build: 'true'");
     expect(scan).toContain("only-fixed: 'false'");
     expect(scan).toContain("if: always() && hashFiles('grype-image.sarif') != ''");

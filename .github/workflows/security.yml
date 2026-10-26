@@ -127,6 +127,7 @@ jobs:
       - uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
         id: grype
         with:
+          grype-version: v0.121.0
           path: .
           severity-cutoff: high
           fail-build: 'true'
@@ -171,6 +172,7 @@ jobs:
       - name: Scan image with Grype
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
         with:
+          grype-version: v0.121.0
           image: gridfinity-${{ matrix.service }}-${{ matrix.target }}:scan
           severity-cutoff: high
           fail-build: 'true'

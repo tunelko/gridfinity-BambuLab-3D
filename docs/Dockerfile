@@ -1,6 +1,9 @@
 # Keep esbuild's compiler behavior, but replace its vulnerable embedded Go runtime.
 FROM golang:1.27.3-alpine3.24@sha256:b8c9b82affbbb82a020bbcf998dad2ba9516944ac7e883524642a481a9505e9c AS esbuild
-RUN GOBIN=/out CGO_ENABLED=0 go install github.com/evanw/esbuild/cmd/esbuild@v0.25.12
+WORKDIR /build
+RUN go mod init gridfinity-esbuild \
+    && go get github.com/evanw/esbuild@v0.25.12 golang.org/x/sys@v0.44.0 \
+    && CGO_ENABLED=0 go build -o /out/esbuild github.com/evanw/esbuild/cmd/esbuild
 
 # ── Build stage ──────────────────────────────────────────────────────────────
 FROM node:24.22.1-alpine3.24@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS build
