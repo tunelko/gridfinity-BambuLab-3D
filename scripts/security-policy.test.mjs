@@ -51,7 +51,7 @@ describe('security workflow failure policy', () => {
 
   it('uses the patched Node release consistently in CI and Docker builders', () => {
     const version = readFileSync(new URL('../.nvmrc', import.meta.url), 'utf8').trim();
-    expect(version).toBe('24.22.1');
+    expect(version).toBe('24.22.3');
     for (const source of [workflow, ciWorkflow]) {
       expect(source).toContain('node-version-file: .nvmrc');
       expect(source).not.toMatch(/node-version:\s*24\b/);
@@ -68,7 +68,7 @@ describe('security workflow failure policy', () => {
 
   it('rebuilds the docs esbuild binary with a patched Go toolchain', () => {
     const dockerfile = readFileSync(new URL('../docs/Dockerfile', import.meta.url), 'utf8');
-    expect(dockerfile).toContain('FROM golang:1.27.3-alpine3.24@sha256:');
+    expect(dockerfile).toContain('FROM golang:1.27.4-alpine3.24@sha256:');
     expect(dockerfile).toContain('go get github.com/evanw/esbuild@v0.25.12 golang.org/x/sys@v0.44.0');
     expect(dockerfile).toContain('go build -o /out/esbuild github.com/evanw/esbuild/cmd/esbuild');
     expect(dockerfile).toContain('COPY --from=esbuild /out/esbuild /tmp/esbuild');

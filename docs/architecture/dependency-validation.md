@@ -1,8 +1,40 @@
 # Dependency advisory remediation
 
-The 2026-10-26 maintenance updates vulnerable dependencies, pins a Node2Shell-patched Node release, and extends blocking scans to both build and runtime images. Geometry, Manifold 3.3.2, Three.js 0.170.0, and the export formats are unchanged. An empty audit means no advisories reported at the time of the check, not a security certification.
+The 2026-11-16 maintenance addresses the new critical zlib findings in all four service/stage images, the documentation Vite advisory, and the Go runtime embedded in esbuild. An empty audit or passing scan describes the advisories known at that time; the dated records below preserve earlier results.
 
-## October 2026 remediation
+## November 2026 remediation
+
+| Finding or component | Correction |
+|---|---|
+| zlib: CVE-2026-4738, reported critical by Grype | Install Alpine `zlib=1.4-r0` in both service builders, both runtimes, and the temporary Go compiler stage |
+| Node | Pin 24.22.3 in `.nvmrc`, package engines and both Docker builders |
+| Documentation Vite: GHSA-8g5g-mxqh-grgj | Advance the existing scoped override from 6.4.4 to 6.4.5 |
+| Embedded Go: GO-2026-6859 | Rebuild the existing esbuild 0.25.12 source with Go 1.27.4; retain the patched x/sys 0.44.0 module |
+| Base images | Refresh the official Node, Go and Nginx digests; retain Alpine 3.24 and Nginx 1.30.6 slim |
+
+The refreshed official base images still contained zlib 1.3.2-r1 when inspected. Updating their digests alone did not fix the finding, so every stage explicitly installs the distribution's [fixed zlib package](https://security.alpinelinux.org/vuln/CVE-2026-4738). The [Vite advisory](https://github.com/advisories/GHSA-8g5g-mxqh-grgj) concerns an exposed development server. The [Go advisory](https://pkg.go.dev/vuln/GO-2026-6859) concerns HTTP server handling in the build toolchain. Production continues to serve static assets through Nginx.
+
+### Remaining findings and scope
+
+- BusyBox CVE-2025-60876 remains medium severity, with no fixed Alpine package available at this check. The application does not send visitor-supplied URLs to wget.
+- The application build tree and npm's own bundle retain medium `glob` and `minimatch` findings. Their published fixes require major-version replacements outside the current parent packages' dependency ranges. Neither package is shipped in the static runtime image. This maintenance does not force those dependency substitutions or downgrade the PWA plugin.
+- `deepmerge` remains a low-severity dependency of the Rollup build tooling, with no published patched version. Some scanner metadata labels its alert medium. It is absent from the static runtime image.
+
+These findings remain visible. The high/critical failure threshold, reports and scanning scope are unchanged; a passing workflow does not mean zero lower-severity findings. The Docker-specific esbuild rebuild still does not replace a binary installed by host-side `npm ci --prefix docs`.
+
+### Verification on 2026-11-16
+
+- Fresh lockfile installations and production builds passed for both services. The application builder passed all 59 tests and generated the three-object 3MF fit kit.
+- `npm audit --audit-level=high` passed for both trees: the application retained four moderate and two low findings, including affected parent packages; documentation had zero findings.
+- Grype 0.121.0 with the database built on 2026-11-16 passed `--fail-on high` for the repository snapshot and all four service/stage images. No findings were ignored. The application builder reported seven medium and one low match, the docs builder five medium matches, and each runtime three medium BusyBox matches.
+- All four service/stage images reported installed `zlib-1.4-r0`; the rebuilt docs compiler reported esbuild 0.25.12. Both Dockerfiles passed Hadolint at warning severity.
+- Four browser downloads passed: all-bin ZIP, selected-bin ZIP, fit-kit ZIP and direct 3MF, including CRCs, STL triangle records, units and object counts. Documentation logos in both themes, local search, result navigation and the dimensional reference passed with zero browser exceptions.
+
+The rollback boundary is the two Dockerfiles, `.nvmrc`, manifests and lockfiles, the existing security-policy version checks, and this maintenance documentation. No geometry or export implementation changes are included. A rollback would restore the affected packages.
+
+## October 2026 remediation (historical)
+
+The following versions and checks describe the 2026-10-26 maintenance, not the current security status.
 
 | Component | Updated version or control |
 |---|---|
